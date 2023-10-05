@@ -10,7 +10,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /desktop ./cmd/desktop
 
 FROM ghcr.io/pod-arcade/sway:main
 
-ENV EXTRA_COMMANDS=/desktop
+ENV EXTRA_COMMANDS="/wait-for-pulse.sh && /desktop"
 
 COPY --from=builder /desktop /desktop
 

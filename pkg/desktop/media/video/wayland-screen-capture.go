@@ -163,6 +163,7 @@ func (c *WaylandScreenCapture) runWFRecorder(ctx context.Context, udpConn *net.U
 			return nil
 		default:
 			// todo some kind of exponential backoff on an error
+			time.Sleep(time.Second * time.Duration(restartCount))
 			if err := c.spawnWFRecorder(ctx, udpConn); err != nil {
 				c.l.Error().Err(err).Msg("WF-Recorder crashed due to an error...")
 			}
