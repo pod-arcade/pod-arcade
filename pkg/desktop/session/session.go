@@ -108,12 +108,6 @@ func (s *Session) setupWebRTC() error {
 	return nil
 }
 
-func (s *Session) sendWebRTCAnswer() {
-	localDesc := s.PeerConnection.LocalDescription()
-	s.l.Debug().Msgf("Sending Answer %v", *localDesc)
-	s.API.SendAnswer(s.SessionID, *localDesc)
-}
-
 func (s *Session) onInputMessage(msg webrtc.DataChannelMessage) {
 	s.l.Trace().MsgFunc(func() string {
 		str := "Handling input from data channel —"
@@ -131,13 +125,19 @@ func (s *Session) onInputMessage(msg webrtc.DataChannelMessage) {
 	}
 }
 
+func (s *Session) OnRemoteICECandidate(c webrtc.ICECandidateInit) {
+	if err := s.PeerConnection.AddICECandidate(c); err != nil {
+		s.l.Error().Err(err).Msg("Failed to set ice candidate")
+	}
+}
+
 func (s *Session) onIceCandidate(c *webrtc.ICECandidate) {
 	if c != nil {
-		s.l.Debug().Msgf("Got ICE Candidate — %v", c.String())
+		s.l.Debug().Msgf("Sending ICE Candidate — %v", c.String())
+		s.API.SendICECandidate(s.SessionID, c.ToJSON())
 	} else {
 		s.l.Debug().Msg("Finished gathering ice candidates")
 	}
-	go s.sendWebRTCAnswer() // This must be done async, or it locks up.
 }
 
 func (s *Session) OnOffer(sdp webrtc.SessionDescription) error {
@@ -145,14 +145,21 @@ func (s *Session) OnOffer(sdp webrtc.SessionDescription) error {
 	if err := s.PeerConnection.SetRemoteDescription(sdp); err != nil {
 		return err
 	}
-	// Send initial response to begin ICE.
+	// Create answer
 	answer, err := s.PeerConnection.CreateAnswer(nil)
 	if err != nil {
 		return err
 	}
+
 	answer = *s.Mixer.AddSDPExtensions(&answer)
 
+	// Update our local state to include the answer
 	s.PeerConnection.SetLocalDescription(answer)
+
+	// Get our local description and send it to the client as an answer
+	localDesc := s.PeerConnection.LocalDescription()
+	s.l.Debug().Msgf("Sending Answer %v", *localDesc)
+	s.API.SendAnswer(s.SessionID, *localDesc)
 
 	return nil
 }

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -22,9 +23,10 @@ type MQTTConfig struct {
 var _ api.ClientAPI = (*MQTTClient)(nil)
 
 type MQTTClient struct {
-	Client  mqtt.Client
-	cfg     MQTTConfig
-	onOffer func(sessionId string, offerSdp webrtc.SessionDescription)
+	Client         mqtt.Client
+	cfg            MQTTConfig
+	onOffer        func(sessionId string, offerSdp webrtc.SessionDescription)
+	onIceCandidate func(sessionId string, candidate webrtc.ICECandidateInit)
 
 	ctx context.Context
 	l   zerolog.Logger
@@ -67,6 +69,7 @@ func (c *MQTTClient) getTopicPrefix() string {
 
 func (c *MQTTClient) OnConnect(client mqtt.Client) {
 	c.l.Debug().Msg("Connected over MQTT")
+	// Setup subscription for offers
 	client.Subscribe(c.getTopicPrefix()+"/sessions/+/webrtc-offer", 0, func(client mqtt.Client, m mqtt.Message) {
 		components := strings.Split(m.Topic(), "/")
 		sessionId := components[3]
@@ -81,6 +84,25 @@ func (c *MQTTClient) OnConnect(client mqtt.Client) {
 		}
 	})
 	c.l.Debug().Msg("Subscribed to webrtc-offer")
+
+	// Listen for Remote ICE Candidates
+	client.Subscribe(c.getTopicPrefix()+"/sessions/+/offer-ice-candidate", 0, func(client mqtt.Client, m mqtt.Message) {
+		components := strings.Split(m.Topic(), "/")
+		sessionId := components[3]
+		candidate := webrtc.ICECandidateInit{}
+		err := json.Unmarshal(m.Payload(), &candidate)
+		if err != nil {
+			c.l.Error().Msgf("Payload is not an ICECandidateInit — %v", string(m.Payload()))
+			return
+		}
+
+		if c.onIceCandidate != nil {
+			c.onIceCandidate(sessionId, candidate)
+		} else {
+			c.l.Warn().Msg("Received ICE Candidate, but no onIceCandidate handler has been supplied")
+		}
+	})
+	c.l.Debug().Msg("Subscribed to offer-ice-candidate")
 
 	c.Client.Publish(c.getTopicPrefix()+"/status", 0, true, "online")
 	c.l.Debug().Msg("Published online status")
@@ -102,6 +124,19 @@ func (c *MQTTClient) OnReconnecting(client mqtt.Client, opts *mqtt.ClientOptions
 func (c *MQTTClient) OnOffer(onOffer func(sessionId string, offerSdp webrtc.SessionDescription)) {
 	c.onOffer = onOffer
 }
+
+func (c *MQTTClient) OnIceCandidate(onIceCandidate func(sessionId string, candidate webrtc.ICECandidateInit)) {
+	c.onIceCandidate = onIceCandidate
+}
+
 func (c *MQTTClient) SendAnswer(sessionId string, answerSdp webrtc.SessionDescription) {
 	c.Client.Publish(c.getTopicPrefix()+"/sessions/"+sessionId+"/webrtc-answer", 0, false, answerSdp.SDP)
+}
+
+func (c *MQTTClient) SendICECandidate(sessionId string, candidate webrtc.ICECandidateInit) {
+	candidateBytes, err := json.Marshal(candidate) // This really shouldn't error...
+	if err != nil {
+		panic(err)
+	}
+	c.Client.Publish(c.getTopicPrefix()+"/sessions/"+sessionId+"/answer-ice-candidate", 0, false, candidateBytes)
 }

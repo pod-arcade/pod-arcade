@@ -36,6 +36,7 @@ func NewDesktop(ctx context.Context, api api.ClientAPI, mixer *PAWebRTC.Mixer, i
 		}),
 	}
 	d.ClientAPI.OnOffer(d.onOffer)
+	d.ClientAPI.OnIceCandidate(d.onIceCandidate)
 	d.captureMetrics()
 	return &d
 }
@@ -82,4 +83,16 @@ func (d *Desktop) onOffer(sessionId string, sdp webrtc.SessionDescription) {
 	} else {
 		sl.Debug().Err(err).Msg("Processed offer")
 	}
+}
+
+func (d *Desktop) onIceCandidate(sessionId string, candidate webrtc.ICECandidateInit) {
+	sl := d.l.With().Str("SessionID", sessionId).Logger()
+	// lookup session by ID, create if not exists
+	session := d.sessions[sessionId]
+
+	if session == nil {
+		sl.Warn().Msg("Received ICE Candidate for session that doesn't exist")
+		return
+	}
+	session.OnRemoteICECandidate(candidate)
 }
