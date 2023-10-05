@@ -229,6 +229,6 @@ func (c *WaylandScreenCapture) Stream(ctx context.Context, pktChan chan<- *rtp.P
 	return nil
 }
 
-func (c *WaylandScreenCapture) GetCodecCapability() webrtc.RTPCodecCapability {
-	return webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}
+func (c *WaylandScreenCapture) GetCodecParameters() webrtc.RTPCodecParameters {
+	return webrtc.RTPCodecParameters{RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypeH264}, PayloadType: 102}
 }

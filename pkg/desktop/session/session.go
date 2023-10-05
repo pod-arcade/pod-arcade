@@ -10,6 +10,7 @@ import (
 	PAWebRTC "github.com/JohnCMcDonough/pod-arcade/pkg/desktop/webrtc"
 	"github.com/JohnCMcDonough/pod-arcade/pkg/logger"
 	"github.com/JohnCMcDonough/pod-arcade/pkg/metrics"
+	"github.com/pion/interceptor"
 	"github.com/pion/webrtc/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
@@ -19,6 +20,8 @@ var INPUT_PROTOCOL string = "pod-arcade-input-v1"
 var TRUE bool = true
 var DATACHANNEL_ID uint16 = 0
 
+var webrtcApi *webrtc.API
+
 type Session struct {
 	SessionID        string
 	API              api.ClientAPI
@@ -26,6 +29,10 @@ type Session struct {
 	InputDataChannel *webrtc.DataChannel
 	InputHub         *input.InputHub
 	Mixer            *PAWebRTC.Mixer
+
+	mediaEngine *webrtc.MediaEngine
+	webrtcApi   *webrtc.API
+	registry    *interceptor.Registry
 
 	l   zerolog.Logger
 	ctx context.Context
@@ -43,8 +50,30 @@ func NewSession(ctx context.Context, api api.ClientAPI, mixer *PAWebRTC.Mixer, i
 		}),
 		ctx: ctx,
 	}
-	session.l.Debug().Msgf("Using ICE Servers — %v", cfg.ICEServers)
-	pc, err := webrtc.NewPeerConnection(webrtc.Configuration{
+
+	if err := session.setupWebRTC(); err != nil {
+		return nil, err
+	}
+
+	return session, nil
+}
+
+func (s *Session) setupWebRTC() error {
+	s.mediaEngine = &webrtc.MediaEngine{}
+	if err := s.mediaEngine.RegisterCodec(s.Mixer.AudioSource.GetCodecParameters(), webrtc.RTPCodecTypeAudio); err != nil {
+		return err
+	}
+	if err := s.mediaEngine.RegisterCodec(s.Mixer.VideoSource.GetCodecParameters(), webrtc.RTPCodecTypeVideo); err != nil {
+		return err
+	}
+	s.registry = &interceptor.Registry{}
+	if err := webrtc.RegisterDefaultInterceptors(s.mediaEngine, s.registry); err != nil {
+		return err
+	}
+	s.webrtcApi = webrtc.NewAPI(webrtc.WithMediaEngine(s.mediaEngine), webrtc.WithInterceptorRegistry(s.registry))
+
+	s.l.Debug().Msgf("Using ICE Servers — %v", cfg.ICEServers)
+	pc, err := webrtcApi.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
 				URLs: cfg.ICEServers,
@@ -52,30 +81,30 @@ func NewSession(ctx context.Context, api api.ClientAPI, mixer *PAWebRTC.Mixer, i
 		},
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	session.PeerConnection = pc
+	s.PeerConnection = pc
 
 	dc, err := pc.CreateDataChannel("input", &webrtc.DataChannelInit{Protocol: &INPUT_PROTOCOL, Negotiated: &TRUE, Ordered: &TRUE, ID: &DATACHANNEL_ID})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	session.InputDataChannel = dc
-	dc.OnMessage(session.onInputMessage)
+	s.InputDataChannel = dc
+	dc.OnMessage(s.onInputMessage)
 
-	for _, track := range session.Mixer.CreateTracks() {
-		session.l.Debug().Msgf("Adding track %v", track)
+	for _, track := range s.Mixer.CreateTracks() {
+		s.l.Debug().Msgf("Adding track %v", track)
 		sender, err := pc.AddTrack(track)
 		if err != nil {
-			session.l.Error().Err(err).Msg("Failed to add track to peer connection")
+			s.l.Error().Err(err).Msg("Failed to add track to peer connection")
 		} else {
-			session.disposeRTPSender(sender)
+			s.disposeRTPSender(sender)
 		}
 	}
 
-	pc.OnICECandidate(session.onIceCandidate)
+	pc.OnICECandidate(s.onIceCandidate)
 
-	return session, nil
+	return nil
 }
 
 func (s *Session) onInputMessage(msg webrtc.DataChannelMessage) {

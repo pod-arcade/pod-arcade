@@ -27,12 +27,12 @@ type Mixer struct {
 }
 
 func NewWebRTCMixer(ctx context.Context, audioSource media.RTPMediaSource, videoSource media.RTPMediaSource) (*Mixer, error) {
-	audioTrack, err := webrtc.NewTrackLocalStaticRTP(audioSource.GetCodecCapability(), "audio", "pion-audio")
+	audioTrack, err := webrtc.NewTrackLocalStaticRTP(audioSource.GetCodecParameters().RTPCodecCapability, "audio", "pion-audio")
 	if err != nil {
 		return nil, err
 	}
 
-	videoTrack, err := webrtc.NewTrackLocalStaticRTP(videoSource.GetCodecCapability(), "video", "pion-video")
+	videoTrack, err := webrtc.NewTrackLocalStaticRTP(videoSource.GetCodecParameters().RTPCodecCapability, "video", "pion-video")
 	if err != nil {
 		return nil, err
 	}

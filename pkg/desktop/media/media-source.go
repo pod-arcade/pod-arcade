@@ -18,7 +18,7 @@ const (
 type RTPMediaSource interface {
 	GetName() string
 	GetType() RTPMediaSourceType
-	GetCodecCapability() webrtc.RTPCodecCapability
+	GetCodecParameters() webrtc.RTPCodecParameters
 	OnDroppedRTPPacket(func(*rtp.Packet))
 	AddSDPExtensions(*sdp.SessionDescription) *sdp.SessionDescription
 

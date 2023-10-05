@@ -129,6 +129,7 @@ func (c *PulseAudioCapture) Stream(ctx context.Context, pktChan chan<- *rtp.Pack
 	}
 }
 
-func (c *PulseAudioCapture) GetCodecCapability() webrtc.RTPCodecCapability {
-	return webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypePCMU}
+func (c *PulseAudioCapture) GetCodecParameters() webrtc.RTPCodecParameters {
+	return webrtc.RTPCodecParameters{RTPCodecCapability: webrtc.RTPCodecCapability{MimeType: webrtc.MimeTypePCMU}, PayloadType: 0}
+
 }
