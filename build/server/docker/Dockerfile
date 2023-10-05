@@ -8,8 +8,8 @@ RUN go mod download
 
 RUN CGO_ENABLED=0 GOOS=linux go build -o /server ./cmd/server
 
-FROM ghcr.io/pod-arcade/sway
+FROM ubuntu:23.10
 
-ENV EXTRA_SWAY_COMMANDS=/desktop
+COPY --from=builder /server /server
 
-COPY --from=builder /desktop /desktop
+ENTRYPOINT [ "/server" ]
