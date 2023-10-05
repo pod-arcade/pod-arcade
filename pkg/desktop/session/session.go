@@ -65,9 +65,6 @@ func (s *Session) setupWebRTC() error {
 		return err
 	}
 	s.registry = &interceptor.Registry{}
-	if err := webrtc.RegisterDefaultInterceptors(s.mediaEngine, s.registry); err != nil {
-		return err
-	}
 	s.webrtcApi = webrtc.NewAPI(webrtc.WithMediaEngine(s.mediaEngine), webrtc.WithInterceptorRegistry(s.registry))
 
 	s.l.Debug().Msgf("Using ICE Servers — %v", cfg.ICEServers)
