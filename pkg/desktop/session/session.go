@@ -20,8 +20,6 @@ var INPUT_PROTOCOL string = "pod-arcade-input-v1"
 var TRUE bool = true
 var DATACHANNEL_ID uint16 = 0
 
-var webrtcApi *webrtc.API
-
 type Session struct {
 	SessionID        string
 	API              api.ClientAPI
@@ -73,7 +71,7 @@ func (s *Session) setupWebRTC() error {
 	s.webrtcApi = webrtc.NewAPI(webrtc.WithMediaEngine(s.mediaEngine), webrtc.WithInterceptorRegistry(s.registry))
 
 	s.l.Debug().Msgf("Using ICE Servers — %v", cfg.ICEServers)
-	pc, err := webrtcApi.NewPeerConnection(webrtc.Configuration{
+	pc, err := s.webrtcApi.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
 			{
 				URLs: cfg.ICEServers,
