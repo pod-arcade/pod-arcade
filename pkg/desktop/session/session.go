@@ -57,6 +57,7 @@ func NewSession(ctx context.Context, api api.ClientAPI, mixer *PAWebRTC.Mixer, i
 }
 
 func (s *Session) setupWebRTC() error {
+	// Setup Media Engine
 	s.mediaEngine = &webrtc.MediaEngine{}
 	if err := s.mediaEngine.RegisterCodec(s.Mixer.AudioSource.GetCodecParameters(), webrtc.RTPCodecTypeAudio); err != nil {
 		return err
@@ -64,9 +65,11 @@ func (s *Session) setupWebRTC() error {
 	if err := s.mediaEngine.RegisterCodec(s.Mixer.VideoSource.GetCodecParameters(), webrtc.RTPCodecTypeVideo); err != nil {
 		return err
 	}
+
 	s.registry = &interceptor.Registry{}
 	s.webrtcApi = webrtc.NewAPI(webrtc.WithMediaEngine(s.mediaEngine), webrtc.WithInterceptorRegistry(s.registry))
 
+	// Create Peer Connection
 	s.l.Debug().Msgf("Using ICE Servers — %v", cfg.ICEServers)
 	pc, err := s.webrtcApi.NewPeerConnection(webrtc.Configuration{
 		ICEServers: []webrtc.ICEServer{
@@ -80,6 +83,7 @@ func (s *Session) setupWebRTC() error {
 	}
 	s.PeerConnection = pc
 
+	// Setup Data Channel
 	dc, err := pc.CreateDataChannel("input", &webrtc.DataChannelInit{Protocol: &INPUT_PROTOCOL, Negotiated: &TRUE, Ordered: &TRUE, ID: &DATACHANNEL_ID})
 	if err != nil {
 		return err
@@ -87,6 +91,7 @@ func (s *Session) setupWebRTC() error {
 	s.InputDataChannel = dc
 	dc.OnMessage(s.onInputMessage)
 
+	// Bind Tracks to this peer connection
 	for _, track := range s.Mixer.CreateTracks() {
 		s.l.Debug().Msgf("Adding track %v", track)
 		sender, err := pc.AddTrack(track)
@@ -97,9 +102,16 @@ func (s *Session) setupWebRTC() error {
 		}
 	}
 
+	// Handle Ice
 	pc.OnICECandidate(s.onIceCandidate)
 
 	return nil
+}
+
+func (s *Session) sendWebRTCAnswer() {
+	localDesc := s.PeerConnection.LocalDescription()
+	s.l.Debug().Msgf("Sending Answer %v", *localDesc)
+	s.API.SendAnswer(s.SessionID, *localDesc)
 }
 
 func (s *Session) onInputMessage(msg webrtc.DataChannelMessage) {
@@ -125,11 +137,7 @@ func (s *Session) onIceCandidate(c *webrtc.ICECandidate) {
 	} else {
 		s.l.Debug().Msg("Finished gathering ice candidates")
 	}
-	if c == nil {
-		localDesc := s.PeerConnection.LocalDescription()
-		s.l.Debug().Msgf("Sending Answer %v", *localDesc)
-		s.API.SendAnswer(s.SessionID, *localDesc)
-	}
+	go s.sendWebRTCAnswer() // This must be done async, or it locks up.
 }
 
 func (s *Session) OnOffer(sdp webrtc.SessionDescription) error {
@@ -137,6 +145,7 @@ func (s *Session) OnOffer(sdp webrtc.SessionDescription) error {
 	if err := s.PeerConnection.SetRemoteDescription(sdp); err != nil {
 		return err
 	}
+	// Send initial response to begin ICE.
 	answer, err := s.PeerConnection.CreateAnswer(nil)
 	if err != nil {
 		return err
