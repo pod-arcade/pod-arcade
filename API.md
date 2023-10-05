@@ -3,6 +3,8 @@ All APIs for interacting with the pod-arcade server, for initiating a WebRTC con
 
 - [MQTT](#mqtt)
   - [Authentication](#authentication)
+  - [Server APIs](#server-apis)
+    - [`server/ice-servers`](#serverice-servers)
   - [Desktop APIs](#desktop-apis)
     - [`desktops/{desktop-id}/status`](#desktopsdesktop-idstatus)
   - [Session APIs](#session-apis)
@@ -23,6 +25,14 @@ The MQTT server is running on the same server as the pod-arcade web server. The 
 
 ### Authentication
 All authentication to the MQTT api is done using MQTT username/password. For user connections, the client id must start with "user:", the username must be that of the user, and the password must be an access token bound to that same username. For desktop connections, the client id must start with "desktop:", the username must be the desktop id, and the password must be the desktop secret.
+
+### Server APIs
+
+#### `server/ice-servers`
+Returns a list of ICE servers that can be used to establish a WebRTC connection. The payload is a JSON array of objects with the following properties:
+- `urls`: A list of URLs that can be used to connect to the ICE server
+- `username`: The username to use when authenticating with the ICE server
+- `credential`: The password to use when authenticating with the ICE server
 
 ### Desktop APIs
 A Desktop represents a single connectable instance of a virtual desktop. `{desktop-id}` represents a unique identifier for a specific desktop. This value is static for a desktop and can be any alphanumeric characters up to 32 in length.
