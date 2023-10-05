@@ -60,7 +60,7 @@ Once sent, the desktop will respond with a `webrtc-answer` message containing a 
 Response SDP from the pod-arcade desktop containing a UTF-8 encoded SDP answer that can be passed into `PeerConnection.setRemoteDescription()`. This event may be triggered more than once after more ICE candidates are gathered.
 
 #### `desktops/{desktop-id}/session/{session-id}/offer-ice-candidate` and `desktops/{desktop-id}/session/{session-id}/answer-ice-candidate`
-Both of these topics are used to send corresponding ice candidates to the other party. The payload should be a UTF-8 encoded ICE candidate obtained from `RTCPeerConnection.onicecandidate`.
+Both of these topics are used to send corresponding ice candidates to the other party. The payload should be a JSON encoded ICE candidate obtained from `RTCPeerConnection.onicecandidate`.
 
 #### `desktops/{desktop-id}/session/{session-id}/stats/{stat}`
 Reports a session statistic to the pod-arcade server. The `:stat` parameter can be any of the following values:
