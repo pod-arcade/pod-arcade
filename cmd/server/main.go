@@ -2,7 +2,6 @@ package main
 
 import (
 	"embed"
-	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/JohnCMcDonough/pod-arcade/pkg/logger"
 	"github.com/JohnCMcDonough/pod-arcade/pkg/metrics"
+	"github.com/JohnCMcDonough/pod-arcade/pkg/server/handlers"
 	"github.com/JohnCMcDonough/pod-arcade/pkg/server/hooks"
 	palisteners "github.com/JohnCMcDonough/pod-arcade/pkg/server/listeners"
 	mqtt "github.com/mochi-mqtt/server/v2"
@@ -58,10 +58,15 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
+
 	mux.HandleFunc("/mqtt", ws.Handler)
+
 	// load static content embedded in the app
-	contentStatic, _ := fs.Sub(httpStaticContent, "build")
-	mux.Handle("/", http.FileServer(http.FS(contentStatic)))
+	spaHandler, err := handlers.NewSinglePageAppHandler(httpStaticContent, "/index.html", "build")
+	if err != nil {
+		panic(err)
+	}
+	mux.Handle("/", spaHandler)
 	l.Debug().Msg("Serving FileSystem")
 
 	mux.Handle("/metrics", metrics.Handle())

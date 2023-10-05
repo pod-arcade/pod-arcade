@@ -11,9 +11,11 @@ require (
 	github.com/mochi-mqtt/server/v2 v2.4.0
 	github.com/pilebones/go-udev v0.9.0
 	github.com/pion/rtp v1.8.2
+	github.com/pion/sdp/v3 v3.0.6
 	github.com/pion/webrtc/v4 v4.0.0-beta.3
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
+	github.com/prometheus/common v0.44.0
 	github.com/rs/zerolog v1.31.0
 	github.com/vansante/go-event-emitter v1.0.2
 	github.com/zaf/g711 v0.0.0-20220109202201-cf0017bf0359
@@ -38,7 +40,6 @@ require (
 	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/rtcp v1.2.10 // indirect
 	github.com/pion/sctp v1.8.9 // indirect
-	github.com/pion/sdp/v3 v3.0.6 // indirect
 	github.com/pion/srtp/v3 v3.0.0 // indirect
 	github.com/pion/stun/v2 v2.0.0 // indirect
 	github.com/pion/transport/v2 v2.2.4 // indirect
@@ -46,7 +47,6 @@ require (
 	github.com/pion/turn/v3 v3.0.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_model v0.4.1-0.20230718164431-9a2bf3000d16 // indirect
-	github.com/prometheus/common v0.44.0 // indirect
 	github.com/prometheus/procfs v0.11.1 // indirect
 	github.com/rs/xid v1.5.0 // indirect
 	github.com/stretchr/testify v1.8.4 // indirect
