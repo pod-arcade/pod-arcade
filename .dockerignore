@@ -1,0 +1,8 @@
+bin/
+assets/
+scripts/
+.vscode/
+docs/
+.gitignore
+LICENSE
+README.md
