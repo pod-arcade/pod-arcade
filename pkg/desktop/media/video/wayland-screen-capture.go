@@ -87,7 +87,7 @@ func (c *WaylandScreenCapture) spawnWFRecorder(ctx context.Context, udpConn *net
 			"tune":           "zerolatency",
 			"profile":        c.Profile,
 			"async_depth":    "1",
-			"global_quality": "30",
+			"global_quality": fmt.Sprint(c.Quality),
 			"gop_size":       "30",
 		}
 	} else {
@@ -104,7 +104,7 @@ func (c *WaylandScreenCapture) spawnWFRecorder(ctx context.Context, udpConn *net
 			"preset":         "ultrafast",
 			"tune":           "zerolatency",
 			"async_depth":    "1",
-			"global_quality": "30",
+			"global_quality": fmt.Sprint(c.Quality),
 			"gop_size":       "30",
 			// "profile":        "baseline", // doesn't work for some reason
 		}
