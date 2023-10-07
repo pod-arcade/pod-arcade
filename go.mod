@@ -1,4 +1,4 @@
-module github.com/JohnCMcDonough/pod-arcade
+module github.com/pod-arcade/pod-arcade
 
 go 1.21.0
 
@@ -10,6 +10,7 @@ require (
 	github.com/jfreymuth/pulse v0.1.0
 	github.com/mochi-mqtt/server/v2 v2.4.0
 	github.com/pilebones/go-udev v0.9.0
+	github.com/pion/interceptor v0.1.19
 	github.com/pion/rtp v1.8.2
 	github.com/pion/sdp/v3 v3.0.6
 	github.com/pion/webrtc/v4 v4.0.0-beta.3
@@ -34,7 +35,6 @@ require (
 	github.com/pion/datachannel v1.5.5 // indirect
 	github.com/pion/dtls/v2 v2.2.7 // indirect
 	github.com/pion/ice/v3 v3.0.1 // indirect
-	github.com/pion/interceptor v0.1.19 // indirect
 	github.com/pion/logging v0.2.2 // indirect
 	github.com/pion/mdns v0.0.8 // indirect
 	github.com/pion/randutil v0.1.0 // indirect

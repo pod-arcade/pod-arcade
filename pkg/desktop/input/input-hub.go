@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/input/gamepad"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/input/udev"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/logger"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/input/gamepad"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/input/udev"
+	"github.com/pod-arcade/pod-arcade/pkg/logger"
 	"github.com/rs/zerolog"
 )
 

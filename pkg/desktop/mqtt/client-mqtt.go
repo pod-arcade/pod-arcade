@@ -8,10 +8,10 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/api"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/logger"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/pion/webrtc/v4"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/api"
+	"github.com/pod-arcade/pod-arcade/pkg/logger"
 	"github.com/rs/zerolog"
 )
 

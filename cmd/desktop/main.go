@@ -6,14 +6,14 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/input"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/media/audio"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/media/video"
-	mqtt "github.com/JohnCMcDonough/pod-arcade/pkg/desktop/mqtt"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/webrtc"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/metrics"
 	"github.com/caarlos0/env/v9"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/input"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/media/audio"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/media/video"
+	mqtt "github.com/pod-arcade/pod-arcade/pkg/desktop/mqtt"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/webrtc"
+	"github.com/pod-arcade/pod-arcade/pkg/metrics"
 )
 
 var cfg DesktopConfig

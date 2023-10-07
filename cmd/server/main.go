@@ -8,16 +8,16 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/JohnCMcDonough/pod-arcade/pkg/logger"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/metrics"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/server/handlers"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/server/hooks"
-	palisteners "github.com/JohnCMcDonough/pod-arcade/pkg/server/listeners"
 	"github.com/caarlos0/env/v9"
 	mqtt "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/hooks/auth"
 	"github.com/mochi-mqtt/server/v2/listeners"
 	"github.com/pion/webrtc/v4"
+	"github.com/pod-arcade/pod-arcade/pkg/logger"
+	"github.com/pod-arcade/pod-arcade/pkg/metrics"
+	"github.com/pod-arcade/pod-arcade/pkg/server/handlers"
+	"github.com/pod-arcade/pod-arcade/pkg/server/hooks"
+	palisteners "github.com/pod-arcade/pod-arcade/pkg/server/listeners"
 )
 
 var ServerConfig struct {

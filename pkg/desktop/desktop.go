@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/api"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/input"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/session"
-	PAWebRTC "github.com/JohnCMcDonough/pod-arcade/pkg/desktop/webrtc"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/logger"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/metrics"
 	"github.com/pion/webrtc/v4"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/api"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/input"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/session"
+	PAWebRTC "github.com/pod-arcade/pod-arcade/pkg/desktop/webrtc"
+	"github.com/pod-arcade/pod-arcade/pkg/logger"
+	"github.com/pod-arcade/pod-arcade/pkg/metrics"
 	"github.com/rs/zerolog"
 )
 

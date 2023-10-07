@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/JohnCMcDonough/pod-arcade/pkg/logger"
 	"github.com/pilebones/go-udev/netlink"
+	"github.com/pod-arcade/pod-arcade/pkg/logger"
 	"github.com/rs/zerolog"
 	"golang.org/x/sys/unix"
 )

@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/api"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/input"
-	PAWebRTC "github.com/JohnCMcDonough/pod-arcade/pkg/desktop/webrtc"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/logger"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/metrics"
 	"github.com/pion/interceptor"
 	"github.com/pion/webrtc/v4"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/api"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/input"
+	PAWebRTC "github.com/pod-arcade/pod-arcade/pkg/desktop/webrtc"
+	"github.com/pod-arcade/pod-arcade/pkg/logger"
+	"github.com/pod-arcade/pod-arcade/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 )

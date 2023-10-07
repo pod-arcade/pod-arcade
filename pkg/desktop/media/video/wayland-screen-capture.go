@@ -13,11 +13,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/media"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/logger"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/metrics"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/media"
+	"github.com/pod-arcade/pod-arcade/pkg/logger"
+	"github.com/pod-arcade/pod-arcade/pkg/metrics"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 )
@@ -46,6 +46,7 @@ type WaylandScreenCapture struct {
 func NewScreenCapture(quality int, hwAccel bool, profile string) *WaylandScreenCapture {
 	cap := &WaylandScreenCapture{
 		Quality:              quality,
+		Profile:              profile,
 		HardwareAcceleration: hwAccel,
 		l: logger.CreateLogger(map[string]string{
 			"Component": "ScreenCapture",

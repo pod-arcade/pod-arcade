@@ -4,10 +4,10 @@ import (
 	"context"
 	"sync"
 
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/media"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/logger"
 	"github.com/pion/rtp"
 	"github.com/pion/webrtc/v4"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/media"
+	"github.com/pod-arcade/pod-arcade/pkg/logger"
 	"github.com/rs/zerolog"
 )
 

@@ -7,10 +7,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/JohnCMcDonough/pod-arcade/pkg/desktop/input/udev"
-	"github.com/JohnCMcDonough/pod-arcade/pkg/logger"
 	"github.com/JohnCMcDonough/uinput"
 	"github.com/pilebones/go-udev/netlink"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/input/udev"
+	"github.com/pod-arcade/pod-arcade/pkg/logger"
 	"github.com/rs/zerolog"
 	eventemitter "github.com/vansante/go-event-emitter"
 )

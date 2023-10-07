@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/JohnCMcDonough/pod-arcade/pkg/logger"
+	"github.com/pod-arcade/pod-arcade/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
