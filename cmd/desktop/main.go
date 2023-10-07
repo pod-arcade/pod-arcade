@@ -21,7 +21,7 @@ var cfg DesktopConfig
 type DesktopConfig struct {
 	MQTTHost    string `env:"MQTT_HOST,expand" envDefault:"ws://localhost:8080/mqtt"`
 	DesktopID   string `env:"DESKTOP_ID,expand" envDefault:""`
-	H264Quality int    `env:"H264_QUALITY,expand" envDefault:"30"`
+	H264Quality int    `env:"H264_QUALITY" envDefault:"30"`
 	H264Profile string `env:"H264_PROFILE,expand" envDefault:"constrained_baseline"`
 }
 
