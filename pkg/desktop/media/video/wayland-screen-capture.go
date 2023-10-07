@@ -37,12 +37,13 @@ type WaylandScreenCapture struct {
 	// 17-18 is visually lossless
 	Quality              int
 	HardwareAcceleration bool
+	Profile              string
 	l                    zerolog.Logger
 	wg                   sync.WaitGroup
 	media.RTPMediaSourceBase
 }
 
-func NewScreenCapture(quality int, hwAccel bool) *WaylandScreenCapture {
+func NewScreenCapture(quality int, hwAccel bool, profile string) *WaylandScreenCapture {
 	cap := &WaylandScreenCapture{
 		Quality:              quality,
 		HardwareAcceleration: hwAccel,
@@ -83,7 +84,7 @@ func (c *WaylandScreenCapture) spawnWFRecorder(ctx context.Context, udpConn *net
 		properties = map[string]string{
 			"preset":         "ultrafast",
 			"tune":           "zerolatency",
-			"profile":        "constrained_baseline",
+			"profile":        c.Profile,
 			"async_depth":    "1",
 			"global_quality": "30",
 			"gop_size":       "30",
