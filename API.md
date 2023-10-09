@@ -33,7 +33,7 @@ For user connections, the client id must start with "user:" . There are several 
 
 The authentication information for users can be retrieved from `/config.json` http endpoint. You can then use the `auth_method` field to determine how you want to proceed. It will be one of `none`, `oidc`, or `psk`
 
-- If the `auth_method` is set to `oidc`, then you may use the `oidc_server` and `oidc_client_id` properties on the config in order to get an ID token for the user.
+- If the `auth_method` is set to `oidc`, then you may use the `oidc_server` and `oidc_client_id` properties on the config in order to get an ID token for the user. **NOTE: Your MQTT username must be set to `user:<token subject>` when connecting with oidc, or it will be rejected.**
 
 - If the `auth_method` is set to `psk`, then you should prompt the user for a pre-shared key in order to authenticate.
 
