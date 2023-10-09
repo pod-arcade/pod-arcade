@@ -21,18 +21,17 @@ import (
 )
 
 var ServerConfig struct {
-	ICEServers []webrtc.ICEServer `json:"ice_servers"`
-
 	OIDCServer   string `env:"OIDC_SERVER" envDefault:"" json:"oidc_server,omitempty"`
 	OIDCClientId string `env:"OIDC_CLIENT_ID" envDefault:"" json:"oidc_client_id,omitempty"`
 
 	AuthMethod string `json:"auth_method"`
 
 	// Not returned back from config endpoint
-	DesktopPSK     string `env:"DESKTOP_PSK" envDefault:"" json:"-"`
-	ClientPSK      string `env:"CLIENT_PSK" envDefault:"" json:"-"`
-	ICEServersJSON string `env:"ICE_SERVERS" envDefault:"[]" json:"-"`
-	RequireAuth    bool   `env:"AUTH_REQUIRED" envDefault:"true" json:"-"`
+	DesktopPSK     string             `env:"DESKTOP_PSK" envDefault:"" json:"-"`
+	ClientPSK      string             `env:"CLIENT_PSK" envDefault:"" json:"-"`
+	ICEServers     []webrtc.ICEServer `json:"-"`
+	ICEServersJSON string             `env:"ICE_SERVERS" envDefault:"[]" json:"-"`
+	RequireAuth    bool               `env:"AUTH_REQUIRED" envDefault:"true" json:"-"`
 }
 
 func init() {
