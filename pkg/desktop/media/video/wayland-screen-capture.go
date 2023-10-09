@@ -18,6 +18,7 @@ import (
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/media"
 	"github.com/pod-arcade/pod-arcade/pkg/logger"
 	"github.com/pod-arcade/pod-arcade/pkg/metrics"
+	"github.com/pod-arcade/pod-arcade/pkg/util"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 )
@@ -88,7 +89,8 @@ func (c *WaylandScreenCapture) spawnWFRecorder(ctx context.Context, udpConn *net
 			"profile":        c.Profile,
 			"async_depth":    "1",
 			"global_quality": fmt.Sprint(c.Quality),
-			"gop_size":       "30",
+			"gop_size":       "5",
+			"open_gop":       "0",
 		}
 	} else {
 		// No hardware acceleration
@@ -103,10 +105,11 @@ func (c *WaylandScreenCapture) spawnWFRecorder(ctx context.Context, udpConn *net
 		properties = map[string]string{
 			"preset":         "ultrafast",
 			"tune":           "zerolatency",
+			"profile":        c.Profile,
 			"async_depth":    "1",
 			"global_quality": fmt.Sprint(c.Quality),
-			"gop_size":       "30",
-			// "profile":        "baseline", // doesn't work for some reason
+			"gop_size":       "5",
+			"open_gop":       "0",
 		}
 	}
 
@@ -122,6 +125,9 @@ func (c *WaylandScreenCapture) spawnWFRecorder(ctx context.Context, udpConn *net
 	}
 
 	videoCmd.WaitDelay = time.Second * 5
+
+	videoCmd.Stderr = util.NewProcessLogWrapper(c.l, zerolog.InfoLevel)
+	videoCmd.Stdout = util.NewProcessLogWrapper(c.l, zerolog.ErrorLevel)
 
 	c.l.Info().Msgf("Launching WF-Recorder with args %v", strings.Join(args, " "))
 

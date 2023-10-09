@@ -2,6 +2,7 @@ package webrtc
 
 import (
 	"context"
+	"math/rand"
 	"sync"
 
 	"github.com/pion/rtp"
@@ -12,6 +13,9 @@ import (
 )
 
 type Mixer struct {
+	VideoDropRate float32
+	AudioDropRate float32
+
 	VideoSource media.RTPMediaSource
 	AudioSource media.RTPMediaSource
 
@@ -44,8 +48,8 @@ func NewWebRTCMixer(ctx context.Context, audioSource media.RTPMediaSource, video
 		AudioSource: audioSource,
 		VideoSource: videoSource,
 
-		audioChan: make(chan *rtp.Packet, 3),
-		videoChan: make(chan *rtp.Packet, 100), // give video a little more leeway. This is still only a max of 120KB
+		audioChan: make(chan *rtp.Packet, 50),
+		videoChan: make(chan *rtp.Packet, 200), // give video a little more leeway. This is still only a max of 120KB
 
 		ctx: ctx,
 		l: logger.CreateLogger(map[string]string{
@@ -63,6 +67,10 @@ func (m *Mixer) Stream() {
 			case <-m.ctx.Done():
 				return
 			case pkt := <-m.audioChan:
+				if m.AudioDropRate != 0 && rand.Float32() < m.AudioDropRate {
+					m.l.Debug().Msg("Simulating dropped video packet")
+					continue
+				}
 				m.l.Trace().Msg("Sending Audio Packet")
 				m.audioTrack.WriteRTP(pkt)
 			}
@@ -75,6 +83,10 @@ func (m *Mixer) Stream() {
 			case <-m.ctx.Done():
 				return
 			case pkt := <-m.videoChan:
+				if m.VideoDropRate != 0 && rand.Float32() < m.VideoDropRate {
+					m.l.Debug().Msg("Simulating dropped video packet")
+					continue
+				}
 				m.l.Trace().Msg("Sending Video Packet")
 				m.videoTrack.WriteRTP(pkt)
 			}

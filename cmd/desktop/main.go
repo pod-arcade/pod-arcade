@@ -19,10 +19,14 @@ import (
 var cfg DesktopConfig
 
 type DesktopConfig struct {
-	MQTTHost    string `env:"MQTT_HOST,expand" envDefault:"ws://localhost:8080/mqtt"`
-	DesktopID   string `env:"DESKTOP_ID,expand" envDefault:""`
-	H264Quality int    `env:"H264_QUALITY" envDefault:"30"`
-	H264Profile string `env:"H264_PROFILE,expand" envDefault:"constrained_baseline"`
+	MQTTHost                string `env:"MQTT_HOST,expand" envDefault:"ws://localhost:8080/mqtt"`
+	DesktopID               string `env:"DESKTOP_ID,expand" envDefault:""`
+	H264Quality             int    `env:"H264_QUALITY" envDefault:"30"`
+	H264Profile             string `env:"H264_PROFILE,expand" envDefault:"constrained_baseline"`
+	DisableHardwareEncoding bool   `env:"DISABLE_HW_ACCEL,expand" envDefault:"false"`
+
+	AudioDropRate float32 `env:"SIM_AUDIO_DROP_RATE,expand" envDefault:"0"`
+	VideoDropRate float32 `env:"SIM_VIDEO_DROP_RATE,expand" envDefault:"0"`
 }
 
 func init() {
@@ -46,7 +50,7 @@ func main() {
 	})
 
 	audioSource := audio.NewPulseAudioCapture()
-	videoSource := video.NewScreenCapture(cfg.H264Quality, true, cfg.H264Profile)
+	videoSource := video.NewScreenCapture(cfg.H264Quality, !cfg.DisableHardwareEncoding, cfg.H264Profile)
 
 	metrics.CaptureMetricsForMediaSource(audioSource)
 	metrics.CaptureMetricsForMediaSource(videoSource)
@@ -55,6 +59,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	mixer.AudioDropRate = cfg.AudioDropRate
+	mixer.VideoDropRate = cfg.VideoDropRate
 
 	inputHub, err := input.NewInputHub(ctx)
 	if err != nil {
