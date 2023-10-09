@@ -23,6 +23,11 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /server ./cmd/server/
 
 FROM ubuntu:23.10
 
+# Install necessary packages like curl, jq, and tar
+RUN apt-get update && \
+    apt-get install -y curl wget ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /server /server
 
 ENTRYPOINT [ "/server" ]
