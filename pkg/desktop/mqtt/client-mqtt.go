@@ -104,6 +104,15 @@ func (c *MQTTClient) OnConnect(client mqtt.Client) {
 	})
 	c.l.Debug().Msg("Subscribed to offer-ice-candidate")
 
+	// Detect bugged status
+	client.Subscribe(c.getTopicPrefix()+"/status", 0, func(client mqtt.Client, m mqtt.Message) {
+		if string(m.Payload()) == "offline" {
+			// If we're online to see this, reset us to online.
+			c.l.Debug().Msg("Saw offline published from us, but we're online to see that message. Resetting status back to online.")
+			c.Client.Publish(c.getTopicPrefix()+"/status", 0, true, "online")
+		}
+	})
+
 	c.Client.Publish(c.getTopicPrefix()+"/status", 0, true, "online")
 	c.l.Debug().Msg("Published online status")
 }
