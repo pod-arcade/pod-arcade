@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -117,8 +118,15 @@ func (h *OpenIDConnectHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Pa
 	t, err := jwt.ParseString(pass,
 		jwt.WithKeySet(keySet),
 		jwt.WithVerify(true),
-		jwt.WithValidator(jwt.ClaimValueIs("sub", user)),
-		jwt.WithValidator(jwt.ClaimValueIs("aud", h.OIDCClientId)),
+		jwt.WithValidator(jwt.ValidatorFunc(func(ctx context.Context, t jwt.Token) jwt.ValidationError {
+			if t.Subject() != user {
+				return jwt.NewValidationError(fmt.Errorf("token sub %v did not match mqtt username %v", t.Subject(), user))
+			}
+			if !slices.Contains(t.Audience(), h.OIDCClientId) {
+				return jwt.NewValidationError(fmt.Errorf("token aud %v does not contain %v", t.Audience(), h.OIDCClientId))
+			}
+			return nil
+		})),
 	)
 
 	if err != nil {
