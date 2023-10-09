@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -18,12 +17,12 @@ import (
 )
 
 type OpenIDConnectHook struct {
-	OAuthServer   string
-	OAuthClientId string
-	ctx           context.Context
+	OIDCServer   string
+	OIDCClientId string
+	ctx          context.Context
 
-	oauthServerWellKnown map[string]interface{}
-	oauthJWKSEndpoint    string
+	oidcServerWellKnown map[string]interface{}
+	oidcJWKSEndpoint    string
 
 	jwkCache jwk.Cache
 
@@ -32,12 +31,11 @@ type OpenIDConnectHook struct {
 
 // Called Automatically when calling NewOAuthHook
 func (h *OpenIDConnectHook) SetupJWKS() error {
-
-	if h.OAuthClientId == "" {
-		h.Log.Error("No Client ID was provided, you will be unable to verify connections")
+	if h.OIDCClientId == "" {
+		return fmt.Errorf("no valid client id was provided")
 	}
 
-	host, err := url.Parse(h.OAuthServer)
+	host, err := url.Parse(h.OIDCServer)
 	if err != nil {
 		return err
 	}
@@ -51,42 +49,41 @@ func (h *OpenIDConnectHook) SetupJWKS() error {
 		return err
 	}
 
-	if err := json.Unmarshal(data, &h.oauthServerWellKnown); err != nil {
+	if err := json.Unmarshal(data, &h.oidcServerWellKnown); err != nil {
 		return err
 	}
 
-	if h.oauthServerWellKnown["jwks_uri"] == nil {
+	if h.oidcServerWellKnown["jwks_uri"] == nil {
 		return fmt.Errorf("no jwks_uri was found on the oauth server")
 	}
-	h.oauthJWKSEndpoint = h.oauthServerWellKnown["jwks_uri"].(string)
+	h.oidcJWKSEndpoint = h.oidcServerWellKnown["jwks_uri"].(string)
 
-	h.Log.Debug("Using JWKS_URI " + h.oauthJWKSEndpoint)
+	h.Log.Debug("Using JWKS_URI " + h.oidcJWKSEndpoint)
 
-	if err := h.jwkCache.Register(h.oauthJWKSEndpoint); err != nil {
+	if err := h.jwkCache.Register(h.oidcJWKSEndpoint); err != nil {
 		return err
 	}
 
-	if _, err := h.jwkCache.Get(h.ctx, h.oauthJWKSEndpoint); err != nil {
+	if _, err := h.jwkCache.Get(h.ctx, h.oidcJWKSEndpoint); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func NewOauthHook(ctx context.Context, oauthServer string, oauthClientId string) (*OpenIDConnectHook, error) {
+func NewOIDCHook(ctx context.Context, oauthServer string, oauthClientId string) *OpenIDConnectHook {
 	h := &OpenIDConnectHook{
-		OAuthServer:   oauthServer,
-		OAuthClientId: oauthClientId,
-		ctx:           ctx,
-		jwkCache:      *jwk.NewCache(ctx),
-	}
-	h.Log = slog.Default()
-
-	if err := h.SetupJWKS(); err != nil {
-		return nil, err
+		OIDCServer:   oauthServer,
+		OIDCClientId: oauthClientId,
+		ctx:          ctx,
+		jwkCache:     *jwk.NewCache(ctx),
 	}
 
-	return h, nil
+	return h
+}
+
+func (h *OpenIDConnectHook) Init(config any) error {
+	return h.SetupJWKS()
 }
 
 func (h *OpenIDConnectHook) ID() string {
@@ -111,7 +108,7 @@ func (h *OpenIDConnectHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Pa
 
 	user = strings.TrimPrefix(user, "user:")
 
-	keySet, err := h.jwkCache.Get(h.ctx, h.oauthJWKSEndpoint)
+	keySet, err := h.jwkCache.Get(h.ctx, h.oidcJWKSEndpoint)
 	if err != nil {
 		h.Log.Warn("Failed to fetch JWK", "error", err)
 		return false
@@ -121,7 +118,7 @@ func (h *OpenIDConnectHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Pa
 		jwt.WithKeySet(keySet),
 		jwt.WithVerify(true),
 		jwt.WithValidator(jwt.ClaimValueIs("sub", user)),
-		jwt.WithValidator(jwt.ClaimValueIs("aud", h.OAuthClientId)),
+		jwt.WithValidator(jwt.ClaimValueIs("aud", h.OIDCClientId)),
 	)
 
 	if err != nil {

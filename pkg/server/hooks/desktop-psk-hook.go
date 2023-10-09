@@ -3,7 +3,6 @@ package hooks
 import (
 	"bytes"
 	"context"
-	"log/slog"
 	"strings"
 
 	mqtt "github.com/mochi-mqtt/server/v2"
@@ -18,14 +17,13 @@ type DesktopPSKHook struct {
 	mqtt.HookBase
 }
 
-func NewDesktopPSKHook(ctx context.Context, psk string) (*DesktopPSKHook, error) {
+func NewDesktopPSKHook(ctx context.Context, psk string) *DesktopPSKHook {
 	h := &DesktopPSKHook{
 		PreSharedKey: psk,
 		ctx:          ctx,
 	}
-	h.Log = slog.Default()
 
-	return h, nil
+	return h
 }
 
 func (h *DesktopPSKHook) ID() string {

@@ -25,7 +25,19 @@ All APIs for interacting with the pod-arcade server, for initiating a WebRTC con
 The MQTT server is running on the same server as the pod-arcade web server. The MQTT server is configured to use websockets, so you can connect to it from a browser.
 
 ### Authentication
-All authentication to the MQTT api is done using MQTT username/password. For user connections, the client id must start with "user:", the username must be that of the user, and the password must be an access token bound to that same username. For desktop connections, the client id must start with "desktop:", the username must be the desktop id, and the password must be the desktop secret.
+All authentication to the MQTT api is done using MQTT username/password.
+
+For desktop connections, the client id must start with "desktop:", the username must be the desktop id, and the password must be the desktop secret. They may only authenticate using this PSK.
+
+For user connections, the client id must start with "user:" . There are several auth methods available for clients.
+
+The authentication information for users can be retrieved from `/config.json` http endpoint. You can then use the `auth_method` field to determine how you want to proceed. It will be one of `none`, `oidc`, or `psk`
+
+- If the `auth_method` is set to `oidc`, then you may use the `oidc_server` and `oidc_client_id` properties on the config in order to get an ID token for the user.
+
+- If the `auth_method` is set to `psk`, then you should prompt the user for a pre-shared key in order to authenticate.
+
+- If the `auth_method` is set to `none`, you may connect to the server without authentication.
 
 ### Server APIs
 

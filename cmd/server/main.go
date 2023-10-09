@@ -6,7 +6,6 @@ import (
 	"log"
 	"log/slog"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 
@@ -22,12 +21,16 @@ import (
 )
 
 var ServerConfig struct {
-	ICEServers   []webrtc.ICEServer `json:"ice_servers"`
-	OIDCServer   string             `env:"OIDC_SERVER" envDefault:"" json:"oidc_server"`
-	OIDCClientId string             `env:"OIDC_CLIENT_ID" envDefault:"" json:"oidc_client_id"`
+	ICEServers []webrtc.ICEServer `json:"ice_servers"`
+
+	OIDCServer   string `env:"OIDC_SERVER" envDefault:"" json:"oidc_server,omitempty"`
+	OIDCClientId string `env:"OIDC_CLIENT_ID" envDefault:"" json:"oidc_client_id,omitempty"`
+
+	AuthMethod string `json:"auth_method"`
 
 	// Not returned back from config endpoint
 	DesktopPSK     string `env:"DESKTOP_PSK" envDefault:"" json:"-"`
+	ClientPSK      string `env:"CLIENT_PSK" envDefault:"" json:"-"`
 	ICEServersJSON string `env:"ICE_SERVERS" envDefault:"[]" json:"-"`
 	RequireAuth    bool   `env:"AUTH_REQUIRED" envDefault:"true" json:"-"`
 }
@@ -54,13 +57,7 @@ func publishICEServers(server *mqtt.Server) {
 
 func main() {
 	// Create signals channel to run server until interrupted
-	sigs := make(chan os.Signal, 1)
-	done := make(chan bool, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigs
-		done <- true
-	}()
+	ctx, _ := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
 	// Create the new MQTT Server.
 	server := mqtt.New(&mqtt.Options{
@@ -71,24 +68,41 @@ func main() {
 	if !ServerConfig.RequireAuth {
 		// Allow all connections.
 		_ = server.AddHook(new(auth.AllowHook), nil)
-	}
+		ServerConfig.AuthMethod = "none"
+	} else {
 
-	if ServerConfig.OIDCServer != "" {
-		// If we have an OIDCServer setup, allow user authentication
-		hook, err := hooks.NewOauthHook(context.Background(), ServerConfig.OIDCServer, ServerConfig.OIDCClientId)
-		if err != nil {
-			panic(err)
-		}
-		_ = server.AddHook(hook, nil)
-	}
+		if ServerConfig.OIDCServer != "" {
+			// If we have an OIDCServer setup, allow user authentication
+			hook := hooks.NewOIDCHook(ctx, ServerConfig.OIDCServer, ServerConfig.OIDCClientId)
+			err := server.AddHook(hook, nil)
+			if err != nil {
+				panic(err)
+			}
 
-	if ServerConfig.DesktopPSK != "" {
-		// If we have an OIDCServer setup, allow user authentication
-		hook, err := hooks.NewDesktopPSKHook(context.Background(), ServerConfig.DesktopPSK)
-		if err != nil {
-			panic(err)
+			ServerConfig.AuthMethod = "oidc"
+		} else if ServerConfig.ClientPSK != "" {
+			// Fallback to offering ClientPSK
+			hook := hooks.NewClientPSKHook(ctx, ServerConfig.ClientPSK)
+			err := server.AddHook(hook, nil)
+			if err != nil {
+				panic(err)
+			}
+
+			ServerConfig.AuthMethod = "psk"
+		} else {
+			server.Log.Warn("No user authentication method was provided (PSK or OIDC)")
 		}
-		_ = server.AddHook(hook, nil)
+
+		if ServerConfig.DesktopPSK != "" {
+			// If we have an OIDCServer setup, allow user authentication
+			hook := hooks.NewDesktopPSKHook(ctx, ServerConfig.DesktopPSK)
+			err := server.AddHook(hook, nil)
+			if err != nil {
+				panic(err)
+			}
+		} else {
+			server.Log.Warn("No Desktop PSK was configured, and auth is required. Desktops may not be able to connect.")
+		}
 	}
 
 	// Always set up the clear retained hook
@@ -151,5 +165,5 @@ func main() {
 
 	publishICEServers(server)
 
-	<-done
+	<-ctx.Done()
 }
