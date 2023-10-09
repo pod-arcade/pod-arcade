@@ -19,7 +19,9 @@ import (
 var cfg DesktopConfig
 
 type DesktopConfig struct {
-	MQTTHost                string `env:"MQTT_HOST,expand" envDefault:"ws://localhost:8080/mqtt"`
+	MQTTHost   string `env:"MQTT_HOST,expand" envDefault:"ws://localhost:8080/mqtt"`
+	DesktopPSK string `env:"DESKTOP_PSK,expand" envDefault:""`
+
 	DesktopID               string `env:"DESKTOP_ID,expand" envDefault:""`
 	H264Quality             int    `env:"H264_QUALITY" envDefault:"30"`
 	H264Profile             string `env:"H264_PROFILE,expand" envDefault:"constrained_baseline"`
@@ -45,8 +47,9 @@ func main() {
 	ctx, _ = signal.NotifyContext(ctx, os.Interrupt, os.Kill)
 
 	api := mqtt.NewMQTTClient(ctx, mqtt.MQTTConfig{
-		Host:      cfg.MQTTHost,
-		DesktopID: cfg.DesktopID,
+		Host:       cfg.MQTTHost,
+		DesktopID:  cfg.DesktopID,
+		DesktopPSK: cfg.DesktopPSK,
 	})
 
 	audioSource := audio.NewPulseAudioCapture()

@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,7 +15,6 @@ import (
 	"github.com/mochi-mqtt/server/v2/hooks/auth"
 	"github.com/mochi-mqtt/server/v2/listeners"
 	"github.com/pion/webrtc/v4"
-	"github.com/pod-arcade/pod-arcade/pkg/logger"
 	"github.com/pod-arcade/pod-arcade/pkg/metrics"
 	"github.com/pod-arcade/pod-arcade/pkg/server/handlers"
 	"github.com/pod-arcade/pod-arcade/pkg/server/hooks"
@@ -21,8 +22,14 @@ import (
 )
 
 var ServerConfig struct {
-	ICEServersJSON string `env:"ICE_SERVERS" envDefault:"[]"`
-	ICEServers     []webrtc.ICEServer
+	ICEServers   []webrtc.ICEServer `json:"ice_servers"`
+	OIDCServer   string             `env:"OIDC_SERVER" envDefault:"" json:"oidc_server"`
+	OIDCClientId string             `env:"OIDC_CLIENT_ID" envDefault:"" json:"oidc_client_id"`
+
+	// Not returned back from config endpoint
+	DesktopPSK     string `env:"DESKTOP_PSK" envDefault:"" json:"-"`
+	ICEServersJSON string `env:"ICE_SERVERS" envDefault:"[]" json:"-"`
+	RequireAuth    bool   `env:"AUTH_REQUIRED" envDefault:"true" json:"-"`
 }
 
 func init() {
@@ -46,11 +53,6 @@ func publishICEServers(server *mqtt.Server) {
 }
 
 func main() {
-
-	l := logger.CreateLogger(map[string]string{
-		"Component": "Server",
-	})
-
 	// Create signals channel to run server until interrupted
 	sigs := make(chan os.Signal, 1)
 	done := make(chan bool, 1)
@@ -63,10 +65,33 @@ func main() {
 	// Create the new MQTT Server.
 	server := mqtt.New(&mqtt.Options{
 		InlineClient: true,
+		Logger:       slog.Default(),
 	})
 
-	// Allow all connections.
-	_ = server.AddHook(new(auth.AllowHook), nil)
+	if !ServerConfig.RequireAuth {
+		// Allow all connections.
+		_ = server.AddHook(new(auth.AllowHook), nil)
+	}
+
+	if ServerConfig.OIDCServer != "" {
+		// If we have an OIDCServer setup, allow user authentication
+		hook, err := hooks.NewOauthHook(context.Background(), ServerConfig.OIDCServer, ServerConfig.OIDCClientId)
+		if err != nil {
+			panic(err)
+		}
+		_ = server.AddHook(hook, nil)
+	}
+
+	if ServerConfig.DesktopPSK != "" {
+		// If we have an OIDCServer setup, allow user authentication
+		hook, err := hooks.NewDesktopPSKHook(context.Background(), ServerConfig.DesktopPSK)
+		if err != nil {
+			panic(err)
+		}
+		_ = server.AddHook(hook, nil)
+	}
+
+	// Always set up the clear retained hook
 	_ = server.AddHook(hooks.NewClearRetainedHook(server), nil)
 
 	// Create a TCP listener on a standard port.
@@ -93,10 +118,23 @@ func main() {
 		panic(err)
 	}
 	mux.Handle("/", spaHandler)
-	l.Debug().Msg("Serving FileSystem")
+
+	server.Log.Debug("Serving FileSystem")
 
 	mux.Handle("/metrics", metrics.Handle())
-	l.Debug().Msg("Serving Metrics")
+	server.Log.Debug("Serving Metrics")
+
+	mux.HandleFunc("/config.json", func(w http.ResponseWriter, r *http.Request) {
+		response, err := json.Marshal(ServerConfig)
+		if err != nil {
+			w.WriteHeader(500)
+			w.Write([]byte("Failed to marshal JSON config"))
+			return
+		}
+		w.WriteHeader(200)
+		w.Write(response)
+	})
+	server.Log.Debug("Serving Metrics")
 
 	go func() {
 		err := server.Serve()

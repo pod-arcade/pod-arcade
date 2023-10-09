@@ -16,8 +16,9 @@ import (
 )
 
 type MQTTConfig struct {
-	Host      string
-	DesktopID string
+	Host       string
+	DesktopID  string
+	DesktopPSK string
 }
 
 var _ api.ClientAPI = (*MQTTClient)(nil)
@@ -45,6 +46,12 @@ func NewMQTTClient(ctx context.Context, cfg MQTTConfig) *MQTTClient {
 
 	opts := mqtt.NewClientOptions()
 	opts.AddBroker(cfg.Host)
+
+	if cfg.DesktopPSK != "" {
+		opts.
+			SetUsername("desktop:" + cfg.DesktopID).
+			SetPassword(cfg.DesktopPSK)
+	}
 
 	opts.SetAutoReconnect(true) // For reconnecting to the same server
 	opts.SetConnectRetry(true)  // For reconnecting if the server doesn't remember the session
