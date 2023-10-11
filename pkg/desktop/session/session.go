@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/pion/interceptor"
+	"github.com/pion/interceptor/pkg/nack"
 	"github.com/pion/webrtc/v4"
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/api"
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/input"
@@ -66,7 +67,19 @@ func (s *Session) setupWebRTC() error {
 		return err
 	}
 
+	// Register NACK Interceptor
 	s.registry = &interceptor.Registry{}
+	responderFac, err := nack.NewResponderInterceptor(nack.ResponderSize(1024), nack.DisableCopy())
+	if err != nil {
+		return err
+	}
+
+	s.registry.Add(responderFac)
+	// don't advertise supporting PLI in the parameter, since we can't actually trigger an IDR frame.
+	s.mediaEngine.RegisterFeedback(webrtc.RTCPFeedback{Type: "nack", Parameter: ""}, webrtc.RTPCodecTypeAudio)
+	s.mediaEngine.RegisterFeedback(webrtc.RTCPFeedback{Type: "nack", Parameter: ""}, webrtc.RTPCodecTypeVideo)
+
+	// Create WebRTC API
 	s.webrtcApi = webrtc.NewAPI(webrtc.WithMediaEngine(s.mediaEngine), webrtc.WithInterceptorRegistry(s.registry))
 
 	// Create Peer Connection
@@ -164,12 +177,15 @@ func (s *Session) OnOffer(sdp webrtc.SessionDescription) error {
 	return nil
 }
 
+// It's worth noting that this is only the leftover packets that we can't process after
+// the interceptors have already done their work.
 func (s *Session) disposeRTPSender(sender *webrtc.RTPSender) {
 	go func() {
 		bytes := make([]byte, 1200)
 		for {
 			_, _, err := sender.Read(bytes)
 			if err != nil {
+				s.l.Warn().Msg("RTP Sender Disposer exiting")
 				return
 			}
 		}
