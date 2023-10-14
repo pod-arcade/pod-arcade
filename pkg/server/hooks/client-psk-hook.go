@@ -50,6 +50,7 @@ func (h *ClientPSKHook) OnConnectAuthenticate(cl *mqtt.Client, pk packets.Packet
 
 	if pass != h.PreSharedKey {
 		h.Log.Warn("User failed to authenticated. Incorrect PSK provided", "User", user)
+		return false
 	}
 
 	h.Log.Info("User authenticated", "User", user)
