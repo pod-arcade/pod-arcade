@@ -89,23 +89,31 @@ func (h *InputHub) HandleInput(input []byte) error {
 	if len(input) == 0 {
 		return fmt.Errorf("Payload length too small — 0 bytes", input[0])
 	}
+	// h.l.Debug().MsgFunc(func() string {
+	// 	sb := strings.Builder{}
+	// 	sb.WriteString("Received Input — ")
+	// 	for _, b := range input {
+	// 		sb.WriteString(fmt.Sprintf("%08b", b))
+	// 	}
+	// 	return sb.String()
+	// })
 	switch InputType(input[0]) {
 	case INPUT_KEYBOARD:
 		if len(input) != 4 {
 			return fmt.Errorf("invalid payload length for keyboard input. Received %v bytes, wanted 4 bytes", len(input))
 		}
 		if h.keyboard == nil {
-			return nil
+			return fmt.Errorf("client send input for a keyboard, but no keyboard is connected")
 		}
 		keyDown := input[1] != 0
 		keyCode := binary.LittleEndian.Uint16(input[2:4])
 		h.keyboard.KeyEvent(keyDown, int(keyCode))
 	case INPUT_MOUSE:
-		if h.mouse == nil {
-			return nil
-		}
 		if len(input) != 18 {
 			return fmt.Errorf("invalid payload length for mouse input. Received %v bytes, wanted 18 bytes", len(input))
+		}
+		if h.mouse == nil {
+			return fmt.Errorf("client send input for a mouse, but no mouse is connected")
 		}
 		leftDown := input[1]&(1<<0) != 0
 		rightDown := input[1]&(1<<1) != 0
@@ -119,8 +127,10 @@ func (h *InputHub) HandleInput(input []byte) error {
 		h.mouse.MiddleClick(middleDown)
 		h.mouse.MoveCursor(mouseX, mouseY)
 		h.mouse.MoveWheel(wheelX, wheelY)
+		// h.l.Debug().Msgf("Mouse — L=%v R=%v M=%v MM=(%v,%v) WM(%v,%v)", leftDown, rightDown, middleDown, mouseX, mouseY, wheelX, wheelY)
 
 	case INPUT_TOUCHSCREEN:
+		return fmt.Errorf("client send input for a touchscreen, but no touchscreen is connected")
 	case INPUT_GAMEPAD:
 		if len(input) != 28 {
 			return fmt.Errorf("invalid payload length for gamepad input. Received %v bytes, wanted 28 bytes", len(input))

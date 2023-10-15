@@ -91,28 +91,52 @@ func (d *Device) Initialize(udev *UDev) {
 	d.l.Debug().Msg("Device created successfully")
 }
 
-func (d *Device) GetUDevDBPath() string {
+func (d *Device) GetUDevDBDevicePath() string {
 	return fmt.Sprintf("/run/udev/data/c%v:%v", d.Major, d.Minor)
+}
+
+func (d *Device) GetUDevDBInputPath() string {
+	components := strings.Split(d.KObj, "/")
+	if len(components) <= 4 {
+		panic("kObj is not in the expected format")
+	}
+	inputId := components[4]
+	return fmt.Sprintf("/run/udev/data/+input:%v", inputId)
 }
 
 func (d *Device) WriteUDevDatabaseData() {
 	// Write udev database information
-	characterDevicePath := d.GetUDevDBPath()
+	uDevDeviceDBPath := d.GetUDevDBDevicePath()
+	uDevInputDBPath := d.GetUDevDBInputPath()
 	data := ""
 	data += fmt.Sprintf("I:%v\n", d.initTime)
 	if d.DeviceType == GAMEPAD {
 		data += "E:ID_INPUT_JOYSTICK=1\n"
 	}
+	if d.DeviceType == MOUSE {
+		data += "E:ID_INPUT_MOUSE=1\n"
+	}
 	data += "E:ID_INPUT=1\n"
 	data += "E:ID_SERIAL=noserial\n"
-	data += "G:seat"
-	data += "G:uaccess"
-	data += "Q:seat"
-	data += "Q:uaccess"
-	data += "V:1"
-	if err := os.WriteFile(characterDevicePath, []byte(data), 0o755); err != nil {
-		d.l.Error().Err(err).Msgf("Failed to write device database to %s", characterDevicePath)
+	data += "G:seat\n"
+	data += "G:uaccess\n"
+	data += "Q:seat\n"
+	data += "Q:uaccess\n"
+	data += "V:1\n"
+	if err := os.WriteFile(uDevDeviceDBPath, []byte(data), 0o755); err != nil {
+		d.l.Error().Err(err).Msgf("Failed to write device database to %s", uDevDeviceDBPath)
 	}
+	if err := os.WriteFile(uDevInputDBPath, []byte(data), 0o755); err != nil {
+		d.l.Error().Err(err).Msgf("Failed to write device database to %s", uDevDeviceDBPath)
+	}
+}
+
+func (d *Device) CleanupUDevDatabaseData() error {
+	// Write udev database information
+	uDevDeviceDBPath := d.GetUDevDBDevicePath()
+	uDevInputDBPath := d.GetUDevDBInputPath()
+	return errors.Join(os.Remove(uDevDeviceDBPath),
+		os.Remove(uDevInputDBPath))
 }
 
 func (d *Device) MakeDeviceNode() {
@@ -141,6 +165,10 @@ func (d *Device) EmitUDevEvent(action netlink.KObjAction) error {
 		evt.Env["ID_INPUT"] = "1"
 		evt.Env["ID_INPUT_JOYSTICK"] = "1"
 		evt.Env[".INPUT_CLASS"] = "joystick"
+	} else if d.DeviceType == MOUSE {
+		evt.Env["ID_INPUT"] = "1"
+		evt.Env[".INPUT_CLASS"] = "mouse"
+		evt.Env["ID_INPUT_MOUSE"] = "1"
 	}
 	evt.Env["ID_SERIAL"] = "noserial"
 	evt.Env["TAGS"] = ":seat:uaccess:"
@@ -159,7 +187,7 @@ func (d *Device) Close() error {
 	return errors.Join(
 		d.EmitUDevEvent(netlink.REMOVE),
 		os.Remove(d.DevPath),
-		os.Remove(d.GetUDevDBPath()),
+		d.CleanupUDevDatabaseData(),
 	)
 }
 
