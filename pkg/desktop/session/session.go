@@ -69,14 +69,13 @@ func (s *Session) setupWebRTC() error {
 
 	// Register NACK Interceptor
 	s.registry = &interceptor.Registry{}
-	responderFac, err := nack.NewResponderInterceptor(nack.ResponderSize(1024), nack.DisableCopy())
+	responderFac, err := nack.NewResponderInterceptor(nack.ResponderSize(2^15), nack.DisableCopy()) //at most, 36MB of data.
 	if err != nil {
 		return err
 	}
 
 	s.registry.Add(responderFac)
 	// don't advertise supporting PLI in the parameter, since we can't actually trigger an IDR frame.
-	s.mediaEngine.RegisterFeedback(webrtc.RTCPFeedback{Type: "nack", Parameter: ""}, webrtc.RTPCodecTypeAudio)
 	s.mediaEngine.RegisterFeedback(webrtc.RTCPFeedback{Type: "nack", Parameter: ""}, webrtc.RTPCodecTypeVideo)
 
 	// Create WebRTC API
