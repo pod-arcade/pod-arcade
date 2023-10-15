@@ -92,7 +92,7 @@ func (h *InputHub) HandleInput(input []byte) error {
 	switch InputType(input[0]) {
 	case INPUT_KEYBOARD:
 		if len(input) != 4 {
-			return fmt.Errorf("invalid payload length for keyboard input. Received %v bytes, wanted 28 bytes", len(input))
+			return fmt.Errorf("invalid payload length for keyboard input. Received %v bytes, wanted 4 bytes", len(input))
 		}
 		if h.keyboard == nil {
 			return nil
@@ -105,7 +105,7 @@ func (h *InputHub) HandleInput(input []byte) error {
 			return nil
 		}
 		if len(input) != 18 {
-			return fmt.Errorf("invalid payload length for mouse input. Received %v bytes, wanted 28 bytes", len(input))
+			return fmt.Errorf("invalid payload length for mouse input. Received %v bytes, wanted 18 bytes", len(input))
 		}
 		leftDown := input[1]&(1<<0) != 0
 		rightDown := input[1]&(1<<1) != 0
