@@ -41,7 +41,7 @@ func CreateVirtualGamepad(udev *udev.UDev, gamepadId int, vendorId int16, produc
 	gp.vendorId = vendorId
 	gp.productId = productId
 	gp.udev = udev
-	gamepadName := fmt.Sprintf("Gamepad %v", gamepadId)
+	gamepadName := fmt.Sprintf("[PA] Gamepad %v", gamepadId)
 
 	gp.l = logger.CreateLogger(map[string]string{
 		"gamepadId": fmt.Sprint(gamepadId),
@@ -66,6 +66,8 @@ func CreateVirtualGamepad(udev *udev.UDev, gamepadId int, vendorId int16, produc
 	} else {
 		gp.syspath = syspath
 	}
+	gp.l = gp.l.With().Str("syspath", gp.syspath).Logger()
+	gp.l.Debug().Msg("Fetched syspath")
 	return gp, nil
 }
 

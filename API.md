@@ -99,7 +99,7 @@ var inputChannel = peerConnection.createDataChannel('input', {
 #### Keyboard: `0x01`
 Payload Format:
 - Byte 0: `0x01`
-- Byte 1: `0x00` for keydown, `0x01` for keyup
+- Byte 1: `0x01` for keydown, `0x00` for keyup
 - Byte 2-3: Keycode (https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values)
 
 #### Mouse: `0x02`
@@ -111,6 +111,8 @@ Payload Format:
   - Bit 2: ButtonMiddle
 - Byte 2-5: X velocity (float32LE)
 - Byte 6-9: Y velocity (float32LE)
+- Byte 10-13: X Wheel (float32LE)
+- Byte 14-17: Y Wheel (float32LE)
 
 #### Touchscreen: `0x03`
 Payload Format:

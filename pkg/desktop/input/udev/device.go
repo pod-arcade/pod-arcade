@@ -100,8 +100,7 @@ func (d *Device) WriteUDevDatabaseData() {
 	characterDevicePath := d.GetUDevDBPath()
 	data := ""
 	data += fmt.Sprintf("I:%v\n", d.initTime)
-	switch d.DeviceType {
-	case GAMEPAD:
+	if d.DeviceType == GAMEPAD {
 		data += "E:ID_INPUT_JOYSTICK=1\n"
 	}
 	data += "E:ID_INPUT=1\n"
@@ -138,9 +137,11 @@ func (d *Device) EmitUDevEvent(action netlink.KObjAction) error {
 	evt.Env["DEVNAME"] = d.DevPath // overwrite the original devpath with our new one
 	evt.Env["SUBSYSTEM"] = "input"
 	evt.Env["USEC_INITIALIZED"] = fmt.Sprint(d.initTime)
-	evt.Env["ID_INPUT"] = "1"
-	evt.Env["ID_INPUT_JOYSTICK"] = "1"
-	evt.Env[".INPUT_CLASS"] = "joystick"
+	if d.DeviceType == GAMEPAD {
+		evt.Env["ID_INPUT"] = "1"
+		evt.Env["ID_INPUT_JOYSTICK"] = "1"
+		evt.Env[".INPUT_CLASS"] = "joystick"
+	}
 	evt.Env["ID_SERIAL"] = "noserial"
 	evt.Env["TAGS"] = ":seat:uaccess:"
 	evt.Env["CURRENT_TAGS"] = ":seat:uaccess:"

@@ -2,9 +2,13 @@ package input
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"math"
 
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/input/gamepad"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/input/keyboard"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/input/mouse"
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/input/udev"
 	"github.com/pod-arcade/pod-arcade/pkg/logger"
 	"github.com/rs/zerolog"
@@ -22,11 +26,27 @@ const (
 type InputHub struct {
 	udev       *udev.UDev
 	gamepadHub *gamepad.GamepadHub
+	keyboard   *keyboard.VirtualKeyboard
+	mouse      *mouse.VirtualMouse
 
 	done chan interface{}
 	ctx  zerolog.Context
 	l    zerolog.Logger
 }
+
+// func (h *InputHub) WriteUDevRules() error {
+// 	if stat, err := os.Stat("/etc/host-udev/rules"); err != nil || !stat.IsDir() {
+// 		h.l.Warn().Msg("Unable to write udev rules to host. /etc/host-udev/rules is not mounted. You may not have proper device isolation, and your host may be able to see gamepads and keyboards created inside pod-arcade.")
+// 		return nil
+// 	}
+// 	file, err := os.OpenFile("/etc/host-udev/rules/50-pod-arcade.rules", os.O_CREATE|os.O_RDWR, 0o777)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	defer file.Close()
+
+// 	return nil
+// }
 
 func NewInputHub(ctx context.Context) (*InputHub, error) {
 	hub := &InputHub{
@@ -43,6 +63,22 @@ func NewInputHub(ctx context.Context) (*InputHub, error) {
 	}
 
 	hub.gamepadHub = gamepad.NewGamepadHub(ctx, hub.udev)
+	hub.l.Info().Msg("Created Virtual Gamepad Hub")
+
+	kb, err := keyboard.NewVirtualKeyboard(ctx, hub.udev)
+	if err != nil {
+		hub.l.Warn().Err(err).Msg("Unable to create virtual keyboard")
+	} else {
+		hub.keyboard = kb
+		hub.l.Info().Msg("Created Virtual Keyboard")
+	}
+	mouse, err := mouse.NewVirtualMouse(ctx, hub.udev)
+	if err != nil {
+		hub.l.Warn().Err(err).Msg("Unable to create virtual mouse")
+	} else {
+		hub.mouse = mouse
+		hub.l.Info().Msg("Created Virtual Mouse")
+	}
 
 	context.AfterFunc(ctx, hub.close)
 
@@ -55,7 +91,35 @@ func (h *InputHub) HandleInput(input []byte) error {
 	}
 	switch InputType(input[0]) {
 	case INPUT_KEYBOARD:
+		if len(input) != 4 {
+			return fmt.Errorf("invalid payload length for keyboard input. Received %v bytes, wanted 28 bytes", len(input))
+		}
+		if h.keyboard == nil {
+			return nil
+		}
+		keyDown := input[1] != 0
+		keyCode := binary.LittleEndian.Uint16(input[2:4])
+		h.keyboard.KeyEvent(keyDown, int(keyCode))
 	case INPUT_MOUSE:
+		if h.mouse == nil {
+			return nil
+		}
+		if len(input) != 18 {
+			return fmt.Errorf("invalid payload length for mouse input. Received %v bytes, wanted 28 bytes", len(input))
+		}
+		leftDown := input[1]&(1<<0) != 0
+		rightDown := input[1]&(1<<1) != 0
+		middleDown := input[1]&(1<<2) != 0
+		mouseX := math.Float32frombits(binary.LittleEndian.Uint32(input[2:6]))
+		mouseY := math.Float32frombits(binary.LittleEndian.Uint32(input[6:10]))
+		wheelX := math.Float32frombits(binary.LittleEndian.Uint32(input[10:14]))
+		wheelY := math.Float32frombits(binary.LittleEndian.Uint32(input[14:18]))
+		h.mouse.LeftClick(leftDown)
+		h.mouse.RightClick(rightDown)
+		h.mouse.MiddleClick(middleDown)
+		h.mouse.MoveCursor(mouseX, mouseY)
+		h.mouse.MoveWheel(wheelX, wheelY)
+
 	case INPUT_TOUCHSCREEN:
 	case INPUT_GAMEPAD:
 		if len(input) != 28 {
@@ -68,7 +132,7 @@ func (h *InputHub) HandleInput(input []byte) error {
 		}
 		return h.gamepadHub.SendInput(int(gamepadId), bitfield)
 	default:
-		return fmt.Errorf("Unknown input type %x", input[0])
+		return fmt.Errorf("unknown input type %x", input[0])
 	}
 	return nil
 }
@@ -78,7 +142,14 @@ func (h *InputHub) close() {
 	go func() {
 		h.l.Debug().Msg("Waiting on Gamepad Hub...")
 		<-h.gamepadHub.Done()
-		h.l.Debug().Msg("Gamepad Hub Closed")
+		if h.keyboard != nil {
+			h.l.Debug().Msg("Waiting on Keyboard...")
+			<-h.keyboard.Done()
+		}
+		if h.mouse != nil {
+			h.l.Debug().Msg("Waiting on Mouse...")
+			<-h.mouse.Done()
+		}
 		h.l.Info().Msg("Input Hub Closed")
 		for {
 			h.done <- nil
