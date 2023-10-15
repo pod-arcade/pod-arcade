@@ -69,7 +69,7 @@ func (s *Session) setupWebRTC() error {
 
 	// Register NACK Interceptor
 	s.registry = &interceptor.Registry{}
-	responderFac, err := nack.NewResponderInterceptor(nack.ResponderSize(2^15), nack.DisableCopy()) //at most, 36MB of data.
+	responderFac, err := nack.NewResponderInterceptor(nack.ResponderSize(32768), nack.DisableCopy()) //at most, 36MB of data.
 	if err != nil {
 		return err
 	}
