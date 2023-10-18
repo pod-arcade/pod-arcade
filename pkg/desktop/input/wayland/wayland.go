@@ -119,19 +119,22 @@ func (c *WaylandInputClient) MoveMouse(dx, dy float64) error {
 func (c *WaylandInputClient) MoveMouseWheel(dx, dy float64) error {
 	c.mtx.RLock()
 	defer c.mtx.RUnlock()
-	if dx != 0 {
-		if err := c.pointer.AxisDiscrete(uint32(time.Now().UnixMilli()), uint32(client.PointerAxisHorizontalScroll), dy*15, int32(dx)); err != nil {
-			return err
+	if c.pointer != nil {
+		if dx != 0 {
+			if err := c.pointer.AxisDiscrete(uint32(time.Now().UnixMilli()), uint32(client.PointerAxisHorizontalScroll), dy*15, int32(dx)); err != nil {
+				return err
+			}
 		}
-	}
-	if dy != 0 {
-		if err := c.pointer.AxisDiscrete(uint32(time.Now().UnixMilli()), uint32(client.PointerAxisVerticalScroll), dy*15, int32(dy)); err != nil {
-			return err
+		if dy != 0 {
+			if err := c.pointer.AxisDiscrete(uint32(time.Now().UnixMilli()), uint32(client.PointerAxisVerticalScroll), dy*15, int32(dy)); err != nil {
+				return err
+			}
 		}
+		return c.pointer.Frame()
 	}
-	return c.pointer.Frame()
+	return nil
 }
-func (c *WaylandInputClient) SetMouseButton(btn uint64, state bool) error {
+func (c *WaylandInputClient) SetMouseButton(btn uint32, state bool) error {
 	c.mtx.RLock()
 	defer c.mtx.RUnlock()
 	if c.pointer != nil {
@@ -139,7 +142,7 @@ func (c *WaylandInputClient) SetMouseButton(btn uint64, state bool) error {
 		if state {
 			stateInt = 1
 		}
-		if err := c.pointer.Button(uint32(time.Now().UnixMilli()), 0x111, stateInt); err != nil {
+		if err := c.pointer.Button(uint32(time.Now().UnixMilli()), btn, stateInt); err != nil {
 			return err
 		}
 		return c.pointer.Frame()
