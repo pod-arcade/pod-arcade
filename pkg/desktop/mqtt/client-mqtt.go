@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"github.com/pion/webrtc/v4"
@@ -63,6 +64,17 @@ func NewMQTTClient(ctx context.Context, cfg MQTTConfig) *MQTTClient {
 
 	opts.WillEnabled = true
 	opts.SetWill(client.getTopicPrefix()+"/status", "offline", 0, true)
+	go func() {
+		ticker := time.NewTicker(time.Second * 60)
+		for {
+			select {
+			case <-ticker.C:
+				client.PublishOnlineMessage()
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	client.Client = mqtt.NewClient(opts)
 	client.l.Info().Msg("Starting MQTT Client")
@@ -72,6 +84,10 @@ func NewMQTTClient(ctx context.Context, cfg MQTTConfig) *MQTTClient {
 
 func (c *MQTTClient) getTopicPrefix() string {
 	return fmt.Sprintf("desktops/%v", c.cfg.DesktopID)
+}
+
+func (c *MQTTClient) PublishOnlineMessage() {
+	c.Client.Publish(c.getTopicPrefix()+"/status", 0, true, "online")
 }
 
 func (c *MQTTClient) OnConnect(client mqtt.Client) {
@@ -116,7 +132,7 @@ func (c *MQTTClient) OnConnect(client mqtt.Client) {
 		if string(m.Payload()) == "offline" {
 			// If we're online to see this, reset us to online.
 			c.l.Debug().Msg("Saw offline published from us, but we're online to see that message. Resetting status back to online.")
-			c.Client.Publish(c.getTopicPrefix()+"/status", 0, true, "online")
+			c.PublishOnlineMessage()
 		}
 	})
 

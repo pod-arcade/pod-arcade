@@ -91,6 +91,7 @@ func (c *WaylandScreenCapture) spawnWFRecorder(ctx context.Context, udpConn *net
 			"global_quality": fmt.Sprint(c.Quality),
 			"gop_size":       "5",
 			"open_gop":       "0",
+			"slices":         "2",
 		}
 	} else {
 		// No hardware acceleration

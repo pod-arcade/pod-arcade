@@ -7,9 +7,8 @@ import (
 	"math"
 
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/input/gamepad"
-	"github.com/pod-arcade/pod-arcade/pkg/desktop/input/keyboard"
-	"github.com/pod-arcade/pod-arcade/pkg/desktop/input/mouse"
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/input/udev"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/input/wayland"
 	"github.com/pod-arcade/pod-arcade/pkg/logger"
 	"github.com/rs/zerolog"
 )
@@ -24,10 +23,11 @@ const (
 )
 
 type InputHub struct {
-	udev       *udev.UDev
-	gamepadHub *gamepad.GamepadHub
-	keyboard   *keyboard.VirtualKeyboard
-	mouse      *mouse.VirtualMouse
+	udev          *udev.UDev
+	gamepadHub    *gamepad.GamepadHub
+	keyboard      Keyboard
+	mouse         Mouse
+	waylandClient *wayland.WaylandInputClient
 
 	done chan interface{}
 	ctx  zerolog.Context
@@ -65,20 +65,12 @@ func NewInputHub(ctx context.Context) (*InputHub, error) {
 	hub.gamepadHub = gamepad.NewGamepadHub(ctx, hub.udev)
 	hub.l.Info().Msg("Created Virtual Gamepad Hub")
 
-	kb, err := keyboard.NewVirtualKeyboard(ctx, hub.udev)
-	if err != nil {
-		hub.l.Warn().Err(err).Msg("Unable to create virtual keyboard")
-	} else {
-		hub.keyboard = kb
-		hub.l.Info().Msg("Created Virtual Keyboard")
+	hub.waylandClient = wayland.NewWaylandInputClient(ctx)
+	if err := hub.waylandClient.Open(); err != nil {
+		return nil, err
 	}
-	mouse, err := mouse.NewVirtualMouse(ctx, hub.udev)
-	if err != nil {
-		hub.l.Warn().Err(err).Msg("Unable to create virtual mouse")
-	} else {
-		hub.mouse = mouse
-		hub.l.Info().Msg("Created Virtual Mouse")
-	}
+	hub.mouse = hub.waylandClient
+	// hub.keyboard = hub.waylandClient
 
 	context.AfterFunc(ctx, hub.close)
 
@@ -87,7 +79,7 @@ func NewInputHub(ctx context.Context) (*InputHub, error) {
 
 func (h *InputHub) HandleInput(input []byte) error {
 	if len(input) == 0 {
-		return fmt.Errorf("Payload length too small — 0 bytes", input[0])
+		return fmt.Errorf("Payload length too small — 0 bytes")
 	}
 	// h.l.Debug().MsgFunc(func() string {
 	// 	sb := strings.Builder{}
@@ -107,7 +99,7 @@ func (h *InputHub) HandleInput(input []byte) error {
 		}
 		keyDown := input[1] != 0
 		keyCode := binary.LittleEndian.Uint16(input[2:4])
-		h.keyboard.KeyEvent(keyDown, int(keyCode))
+		h.keyboard.SetKeyboardKey(int(keyCode), keyDown)
 	case INPUT_MOUSE:
 		if len(input) != 18 {
 			return fmt.Errorf("invalid payload length for mouse input. Received %v bytes, wanted 18 bytes", len(input))
@@ -122,13 +114,12 @@ func (h *InputHub) HandleInput(input []byte) error {
 		mouseY := math.Float32frombits(binary.LittleEndian.Uint32(input[6:10]))
 		wheelX := math.Float32frombits(binary.LittleEndian.Uint32(input[10:14]))
 		wheelY := math.Float32frombits(binary.LittleEndian.Uint32(input[14:18]))
-		h.mouse.LeftClick(leftDown)
-		h.mouse.RightClick(rightDown)
-		h.mouse.MiddleClick(middleDown)
-		h.mouse.MoveCursor(mouseX, mouseY)
-		h.mouse.MoveWheel(wheelX, wheelY)
+		h.mouse.SetMouseButtonLeft(leftDown)
+		h.mouse.SetMouseButtonRight(rightDown)
+		h.mouse.SetMouseButtonMiddle(middleDown)
+		h.mouse.MoveMouse(float64(mouseX), float64(mouseY))
+		h.mouse.MoveMouseWheel(float64(wheelX), float64(wheelY))
 		// h.l.Debug().Msgf("Mouse — L=%v R=%v M=%v MM=(%v,%v) WM(%v,%v)", leftDown, rightDown, middleDown, mouseX, mouseY, wheelX, wheelY)
-
 	case INPUT_TOUCHSCREEN:
 		return fmt.Errorf("client send input for a touchscreen, but no touchscreen is connected")
 	case INPUT_GAMEPAD:
@@ -152,13 +143,9 @@ func (h *InputHub) close() {
 	go func() {
 		h.l.Debug().Msg("Waiting on Gamepad Hub...")
 		<-h.gamepadHub.Done()
-		if h.keyboard != nil {
-			h.l.Debug().Msg("Waiting on Keyboard...")
-			<-h.keyboard.Done()
-		}
-		if h.mouse != nil {
-			h.l.Debug().Msg("Waiting on Mouse...")
-			<-h.mouse.Done()
+		if h.waylandClient != nil {
+			h.l.Debug().Msg("Waiting on Wayland Client...")
+			h.waylandClient.Close()
 		}
 		h.l.Info().Msg("Input Hub Closed")
 		for {

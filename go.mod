@@ -18,6 +18,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
 	github.com/prometheus/common v0.44.0
+	github.com/rajveermalviya/go-wayland/wayland v0.0.0-20230130181619-0ad78d1310b2
 	github.com/rs/zerolog v1.31.0
 	github.com/vansante/go-event-emitter v1.0.2
 	github.com/zaf/g711 v0.0.0-20220109202201-cf0017bf0359
