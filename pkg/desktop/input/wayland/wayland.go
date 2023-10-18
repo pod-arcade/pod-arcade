@@ -8,6 +8,7 @@ import (
 
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/wayland/wlr_virtual_keyboard"
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/wayland/wlr_virtual_pointer"
+	"github.com/pod-arcade/pod-arcade/pkg/logger"
 	"github.com/rajveermalviya/go-wayland/wayland/client"
 	"github.com/rs/zerolog"
 )
@@ -29,7 +30,9 @@ type WaylandInputClient struct {
 func NewWaylandInputClient(ctx context.Context) *WaylandInputClient {
 	c := &WaylandInputClient{
 		ctx: ctx,
-		l:   zerolog.New(zerolog.NewConsoleWriter()).Level(zerolog.DebugLevel).With().Timestamp().Logger(),
+		l: logger.CreateLogger(map[string]string{
+			"Component": "WaylandInputClient",
+		}),
 	}
 
 	context.AfterFunc(ctx, c.Close)
