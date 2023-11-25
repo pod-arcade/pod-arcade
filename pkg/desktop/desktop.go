@@ -2,97 +2,256 @@ package desktop
 
 import (
 	"context"
-	"time"
+	"sync"
 
 	"github.com/pion/webrtc/v4"
-	"github.com/pod-arcade/pod-arcade/pkg/desktop/api"
-	"github.com/pod-arcade/pod-arcade/pkg/desktop/input"
-	"github.com/pod-arcade/pod-arcade/pkg/desktop/session"
-	PAWebRTC "github.com/pod-arcade/pod-arcade/pkg/desktop/webrtc"
-	"github.com/pod-arcade/pod-arcade/pkg/logger"
-	"github.com/pod-arcade/pod-arcade/pkg/metrics"
+	"github.com/pod-arcade/pod-arcade/api"
+	"github.com/pod-arcade/pod-arcade/pkg/log"
+	"github.com/pod-arcade/pod-arcade/pkg/util"
 	"github.com/rs/zerolog"
 )
 
+var _ api.Desktop = (*Desktop)(nil)
+
 type Desktop struct {
-	ClientAPI api.ClientAPI
-	sessions  map[string]*session.Session
-	mixer     *PAWebRTC.Mixer
-	inputHub  *input.InputHub
+	signalers []api.Signaler
+	gamepads  []api.Gamepad
+	keyboard  api.Keyboard
+	mouse     api.Mouse
 
+	mixer         *Mixer
+	webrtcAPI     *webrtc.API
+	webrtcAPIConf *webrtc.Configuration
+
+	inputChannels map[api.SessionID]*webrtc.DataChannel
+
+	rwm sync.RWMutex
 	l   zerolog.Logger
-	ctx context.Context
 }
 
-func NewDesktop(ctx context.Context, api api.ClientAPI, mixer *PAWebRTC.Mixer, inputHub *input.InputHub) *Desktop {
-	d := Desktop{
-		ClientAPI: api,
-		ctx:       ctx,
-		mixer:     mixer,
-		inputHub:  inputHub,
-		sessions:  map[string]*session.Session{},
-		l: logger.CreateLogger(map[string]string{
-			"Component": "Desktop",
-		}),
+func NewDesktop() api.Desktop {
+	return &Desktop{
+		l:             log.NewLogger("Desktop", nil),
+		mixer:         NewMixer(),
+		inputChannels: map[api.SessionID]*webrtc.DataChannel{},
 	}
-	d.ClientAPI.OnOffer(d.onOffer)
-	d.ClientAPI.OnIceCandidate(d.onIceCandidate)
-	d.captureMetrics()
-	return &d
 }
 
-func (d *Desktop) captureMetrics() {
-	go func() {
-		go func() {
-			ticker := time.NewTicker(5 * time.Second)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-d.ctx.Done():
-					return
-				case <-ticker.C:
-					for sessionId, session := range d.sessions {
-						if session.PeerConnection.ConnectionState() != webrtc.PeerConnectionStateConnected {
-							continue // everything breaks if we try to get metrics for a disconnected client.
-						}
-						stats := session.PeerConnection.GetStats()
-						metrics.ProcessWebRTCStats(d.ctx, sessionId, stats)
-					}
-				}
-			}
-		}()
-	}()
+func (d *Desktop) WithSignaler(s api.Signaler) api.Desktop {
+	d.l.Info().Msgf("Adding signaler %s", s.GetName())
+	d.signalers = append(d.signalers, s)
+	s.SetNewSessionHandler(d.HandleSession)
+	return d
+}
+func (d *Desktop) WithGamepad(g api.Gamepad) api.Desktop {
+	d.l.Info().Msgf("Adding gamepad %s", g.GetName())
+	d.gamepads = append(d.gamepads, g)
+	return d
+}
+func (d *Desktop) WithKeyboard(k api.Keyboard) api.Desktop {
+	d.l.Info().Msgf("Adding keyboard %s", k.GetName())
+	d.keyboard = k
+	return d
+}
+func (d *Desktop) WithMouse(m api.Mouse) api.Desktop {
+	d.l.Info().Msgf("Adding mouse %s", m.GetName())
+	d.mouse = m
+	return d
+}
+func (d *Desktop) WithVideoSource(v api.VideoSource) api.Desktop {
+	d.l.Info().Msgf("Adding video source %s", v.GetName())
+	d.mixer.AddVideoSource(v)
+	return d
+}
+func (d *Desktop) WithAudioSource(a api.AudioSource) api.Desktop {
+	d.l.Info().Msgf("Adding audio source %s", a.GetName())
+	d.mixer.AddAudioSource(a)
+	return d
+}
+func (d *Desktop) WithWebRTCAPI(api *webrtc.API, conf *webrtc.Configuration) api.Desktop {
+	d.webrtcAPI = api
+	d.webrtcAPIConf = conf
+	return d
 }
 
-func (d *Desktop) onOffer(sessionId string, sdp webrtc.SessionDescription) {
-	sl := d.l.With().Str("SessionID", sessionId).Logger()
-	// lookup session by ID, create if not exists
-	if d.sessions[sessionId] == nil {
-		s, err := session.NewSession(d.ctx, d.ClientAPI, d.mixer, d.inputHub, sessionId)
+func (d *Desktop) GetSignalers() []api.Signaler {
+	return d.signalers
+}
+func (d *Desktop) GetGamepads() []api.Gamepad {
+	return d.gamepads
+}
+func (d *Desktop) GetAudioSources() []api.AudioSource {
+	return d.mixer.GetAudioSources()
+}
+func (d *Desktop) GetVideoSources() []api.VideoSource {
+	return d.mixer.GetVideoSources()
+}
+func (d *Desktop) GetKeyboard() api.Keyboard {
+	return d.keyboard
+}
+func (d *Desktop) GetMouse() api.Mouse {
+	return d.mouse
+}
+func (d *Desktop) GetWebRTCAPI() (api *webrtc.API, conf *webrtc.Configuration) {
+	return d.webrtcAPI, d.webrtcAPIConf
+}
+
+func (d *Desktop) HandleGamepadRumble(rumble api.GamepadRumble) {
+	d.rwm.RLock()
+	defer d.rwm.RUnlock()
+
+	d.l.Trace().Msgf("Handling gamepad rumble %v", rumble)
+	data := rumble.ToBytes()
+	for _, c := range d.inputChannels {
+		if c != nil {
+			c.Send(data)
+		}
+	}
+}
+
+func (d *Desktop) HandleInputMessage(data []byte) {
+	d.l.Trace().Msgf("Handling input message %v", data)
+
+	switch api.InputType(data[0]) {
+	case api.InputTypeKeyboard:
+	case api.InputTypeMouse:
+	case api.InputTypeTouchscreen:
+	case api.InputTypeGamepad:
+		input := api.GamepadInput{}
+		err := input.FromBytes(data)
 		if err != nil {
-			sl.Error().Err(err).Msg("Failed to create a new session")
+			d.l.Warn().Err(err).Msg("Failed to parse gamepad input")
 			return
 		}
-		sl.Info().Err(err).Msg("Created new session")
-		d.sessions[sessionId] = s
-	}
-	// pass offer to the session
-	s := d.sessions[sessionId]
-	if err := s.OnOffer(sdp); err != nil {
-		sl.Error().Err(err).Str("SessionID", sessionId).Msg("Failed to process offer")
-	} else {
-		sl.Debug().Err(err).Msg("Processed offer")
+		if int(input.PadID) >= len(d.gamepads) {
+			d.l.Warn().Msgf("Received gamepad input for gamepad %v, but we only have %v gamepads", input.PadID, len(d.gamepads))
+			return
+		}
+		if err := d.gamepads[input.PadID].SetGamepadInputState(input); err != nil {
+			d.l.Warn().Err(err).Msgf("Failed to set gamepad input state for gamepad %v", input.PadID)
+		}
+	default:
+		d.l.Warn().Msgf("Unknown input type %v", data[0])
 	}
 }
 
-func (d *Desktop) onIceCandidate(sessionId string, candidate webrtc.ICECandidateInit) {
-	sl := d.l.With().Str("SessionID", sessionId).Logger()
-	// lookup session by ID, create if not exists
-	session := d.sessions[sessionId]
+func (d *Desktop) HandleSession(s api.Session) error {
+	d.rwm.Lock()
+	defer d.rwm.Unlock()
+	pc := s.GetPeerConnection()
 
-	if session == nil {
-		sl.Warn().Msg("Received ICE Candidate for session that doesn't exist")
-		return
+	// Register Video with peer connection
+	for _, v := range d.mixer.GetVideoTracks() {
+		sender, err := pc.AddTrack(v)
+		if err != nil {
+			return err
+		}
+		d.runPacketDisposer(sender)
 	}
-	session.OnRemoteICECandidate(candidate)
+
+	// Register Audio with peer connection
+	for _, v := range d.mixer.GetAudioTracks() {
+		sender, err := pc.AddTrack(v)
+		if err != nil {
+			return err
+		}
+		d.runPacketDisposer(sender)
+	}
+
+	// Create Input Channel
+	input, err := pc.CreateDataChannel("input", &webrtc.DataChannelInit{
+		ID:         util.TypeToPointer[uint16](0),
+		Ordered:    util.TypeToPointer(true),
+		Protocol:   util.TypeToPointer("pod-arcade-input-v1"),
+		Negotiated: util.TypeToPointer(true),
+	})
+	if err != nil {
+		return err
+	}
+	d.inputChannels[s.GetID()] = input
+
+	// Handle Input Messages
+	input.OnMessage(func(msg webrtc.DataChannelMessage) {
+		d.HandleInputMessage(msg.Data)
+	})
+
+	// Handle Peer Connection disconnect
+	pc.OnConnectionStateChange(func(state webrtc.PeerConnectionState) {
+		// If we're disconnected
+		if state == webrtc.PeerConnectionStateDisconnected ||
+			state == webrtc.PeerConnectionStateFailed ||
+			state == webrtc.PeerConnectionStateClosed {
+			d.inputChannels[s.GetID()] = nil
+		}
+	})
+
+	return nil
+}
+
+func (d *Desktop) Run(ctx context.Context) error {
+	if d.webrtcAPI == nil {
+		d.webrtcAPI = webrtc.NewAPI()
+	}
+
+	wg := sync.WaitGroup{}
+
+	// Start Gamepads
+	for _, g := range d.gamepads {
+		err := g.OpenGamepad()
+		if err != nil {
+			return err
+		}
+		defer g.Close()
+	}
+
+	// Start Keyboard
+	if d.keyboard != nil {
+		err := d.keyboard.Open()
+		if err != nil {
+			return err
+		}
+		defer d.keyboard.Close()
+	}
+
+	// Start Mouse
+	if d.mouse != nil {
+		err := d.mouse.Open()
+		if err != nil {
+			return err
+		}
+		defer d.mouse.Close()
+	}
+
+	// Register Signalers
+	for _, s := range d.signalers {
+		// Start the signaler with the context
+		s.SetNewSessionHandler(d.HandleSession)
+		wg.Add(1)
+		go func(s api.Signaler) {
+			defer wg.Done()
+			s.Run(ctx, d)
+		}(s)
+	}
+
+	err := d.mixer.Stream(ctx)
+
+	// Wait for all of our signalers to shut down
+	// no matter whether we had an error streaming or not.
+	// we need them to clean up first
+	wg.Wait()
+
+	return err
+}
+
+func (d *Desktop) runPacketDisposer(s *webrtc.RTPSender) {
+	go func() {
+		buf := make([]byte, 1500)
+		for {
+			_, _, err := s.Read(buf)
+			if err != nil {
+				d.l.Debug().Err(err).Msg("Stopping RTP Sender")
+				return
+			}
+		}
+	}()
 }

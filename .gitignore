@@ -21,7 +21,7 @@
 go.work
 
 # Ignore compiled binaries
-bin/
+bin/**
 
 # Directory where static files are copied
 cmd/server/build
