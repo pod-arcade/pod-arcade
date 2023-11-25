@@ -83,13 +83,13 @@ Heres some screenshots of Pod-Arcade in action:
 
 ### Homepage
 
-<img src="assets/screenshots/homepage.PNG" width=720px />
+<img src="assets/screenshots/homepage.png" width=720px />
 
 ### Mario Kart 64
 
-<img src="assets/screenshots/mario-kart-n64-1.PNG" width=720px />
+<img src="assets/screenshots/mario-kart-n64-1.png" width=720px />
 
-<img src="assets/screenshots/mario-kart-n64-2.PNG" width=720px />
+<img src="assets/screenshots/mario-kart-n64-2.png" width=720px />
 
 # License
 Pod-Arcade is licensed under the MIT License - see the LICENSE file for details.
