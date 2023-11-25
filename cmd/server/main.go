@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"log/slog"
 	"net/http"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/caarlos0/env/v9"
 	mqtt "github.com/mochi-mqtt/server/v2"
@@ -18,6 +20,7 @@ import (
 	"github.com/pod-arcade/pod-arcade/pkg/server/handlers"
 	"github.com/pod-arcade/pod-arcade/pkg/server/hooks"
 	palisteners "github.com/pod-arcade/pod-arcade/pkg/server/listeners"
+	"github.com/pod-arcade/pod-arcade/pkg/util"
 )
 
 var ServerConfig struct {
@@ -31,7 +34,14 @@ var ServerConfig struct {
 	ClientPSK      string             `env:"CLIENT_PSK" envDefault:"" json:"-"`
 	ICEServers     []webrtc.ICEServer `json:"-"`
 	ICEServersJSON string             `env:"ICE_SERVERS" envDefault:"[]" json:"-"`
-	RequireAuth    bool               `env:"AUTH_REQUIRED" envDefault:"true" json:"-"`
+	RequireAuth    bool               `env:"AUTH_REQUIRED" envDefault:"false" json:"-"`
+
+	HTTPPort int `env:"HTTP_PORT" envDefault:"8080" json:"-"`
+
+	ServeTLS bool   `env:"SERVE_TLS" envDefault:"false" json:"-"`
+	TLSPort  int    `env:"TLS_PORT" envDefault:"8443" json:"-"`
+	TLSKey   string `env:"TLS_KEY" envDefault:"" json:"-"`
+	TLSCert  string `env:"TLS_CERT" envDefault:"" json:"-"`
 }
 
 func init() {
@@ -157,12 +167,45 @@ func main() {
 	}()
 
 	go func() {
-		if err := http.ListenAndServe("0.0.0.0:8080", mux); err != nil {
+		server.Log.Info(fmt.Sprintf("Serving HTTP on port %v", ServerConfig.HTTPPort))
+		if err := http.ListenAndServe(fmt.Sprintf("0.0.0.0:%v", ServerConfig.HTTPPort), mux); err != nil {
 			panic(err)
 		}
 	}()
+	if ServerConfig.ServeTLS {
+		go func() {
+			s := http.Server{
+				Addr:    fmt.Sprintf("0.0.0.0:%v", ServerConfig.TLSPort),
+				Handler: mux,
+			}
+			if ServerConfig.TLSKey == "" || ServerConfig.TLSCert == "" {
+				tlsConfig, err := util.GenerateTLSConf()
+				s.TLSConfig = tlsConfig
+				if err != nil {
+					panic(err)
+				}
+			}
+			server.Log.Info(fmt.Sprintf("Serving HTTPS on port %v", ServerConfig.TLSPort))
+			if err := s.ListenAndServeTLS(ServerConfig.TLSCert, ServerConfig.TLSKey); err != nil {
+				panic(err)
+			}
+		}()
+	}
 
-	publishICEServers(server)
+	publishICEServers(server) // publish the ICE Servers on startup
+	go func() {
+		// republish the ICE Servers every so often...
+		ticker := time.NewTicker(1 * time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				publishICEServers(server)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 
 	<-ctx.Done()
 }
