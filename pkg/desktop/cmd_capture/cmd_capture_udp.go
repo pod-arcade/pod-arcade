@@ -13,9 +13,9 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type CommandConfigurator interface {
+type CommandConfiguratorRTP interface {
 	GetName() string
-	GetProgramRunner(addr net.UDPAddr) (*util.ProgramRunner, error)
+	GetProgramRunnerUDP(addr net.UDPAddr) (*util.ProgramRunner, error)
 	GetVideoCodecParameters() *webrtc.RTPCodecParameters
 	GetAudioCodecParameters() *webrtc.RTPCodecParameters
 }
@@ -24,13 +24,13 @@ var _ api.VideoSource = (*CommandCaptureRTP)(nil)
 var _ api.AudioSource = (*CommandCaptureRTP)(nil)
 
 type CommandCaptureRTP struct {
-	configurator CommandConfigurator
+	configurator CommandConfiguratorRTP
 
 	l  zerolog.Logger
 	wg sync.WaitGroup
 }
 
-func NewCommandCaptureRTP(c CommandConfigurator) *CommandCaptureRTP {
+func NewCommandCaptureRTP(c CommandConfiguratorRTP) *CommandCaptureRTP {
 	cap := &CommandCaptureRTP{
 		configurator: c,
 		l:            log.NewLogger(c.GetName(), nil),
@@ -143,7 +143,7 @@ func (c *CommandCaptureRTP) Stream(ctx context.Context, pktChan chan<- *rtp.Pack
 	// This will run until context cancel
 	c.handleUDPPackets(udpCtx, udpConn, pktChan)
 
-	program, err := c.configurator.GetProgramRunner(*udpConn.LocalAddr().(*net.UDPAddr))
+	program, err := c.configurator.GetProgramRunnerUDP(*udpConn.LocalAddr().(*net.UDPAddr))
 	c.l.Info().Msgf("Starting Program — %v", program.String())
 	if err != nil {
 		return err

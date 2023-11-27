@@ -32,7 +32,7 @@ func main() {
 	d := desktop.
 		NewDesktop().
 		WithVideoSource(
-			cmd_capture.NewCommandCaptureRTP(
+			cmd_capture.NewCommandCaptureH264(
 				wf_recorder.NewScreenCapture(30, true, "constrained_baseline"),
 			)).
 		WithAudioSource(pulseaudio.NewPulseAudioCapture()).

@@ -7,7 +7,9 @@ import (
 
 	"github.com/pion/webrtc/v4"
 	"github.com/pod-arcade/pod-arcade/pkg/desktop"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/cmd_capture"
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/mqtt"
+	"github.com/pod-arcade/pod-arcade/pkg/desktop/sample_recorder"
 )
 
 func main() {
@@ -29,7 +31,8 @@ func main() {
 			Host:       os.Getenv("MQTT_HOST"),
 			DesktopID:  os.Getenv("DESKTOP_ID"),
 			DesktopPSK: os.Getenv("DESKTOP_PSK"),
-		}))
+		})).
+		WithVideoSource(cmd_capture.NewCommandCaptureH264(&sample_recorder.SampleRecorder{}))
 
 	// Register a webrtc API. Includes all of the codecs, interceptors, etc.
 	webrtcAPI, err := desktop.GetWebRTCAPI(d)
