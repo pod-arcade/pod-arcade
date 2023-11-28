@@ -68,7 +68,7 @@ func (c *CommandCaptureH264) handleFifoCreate(ctx context.Context) (*os.File, er
 	return file, nil
 }
 
-// asynchronously runs a handler that reads UDP packets, and converts them into RTP packets, publishing it to a channel
+// asynchronously runs a handler that reads h264 NALs from the stream, and converts them into RTP packets, publishing it to a channel
 func (c *CommandCaptureH264) handleH264Stream(ctx context.Context, stream io.ReadCloser, pktChan chan<- *rtp.Packet) error {
 	reader, err := h264reader.NewReader(stream)
 	payloader := &codecs.H264Payloader{}
@@ -118,11 +118,11 @@ func (c *CommandCaptureH264) handleH264Stream(ctx context.Context, stream io.Rea
 func (c *CommandCaptureH264) Stream(ctx context.Context, pktChan chan<- *rtp.Packet) error {
 	c.l.Info().Msg("Starting Stream")
 
-	// Create new context so we can cancel the UDP server in the event of an error
+	// Create new context so we can cancel the stream in the event of an error
 	fileCtx, stopFile := context.WithCancel(ctx)
 	defer stopFile()
 
-	// Start the UDP listener. This will shut down when the context closes
+	// Open the FIFO stream. This will shut down when the context closes
 	c.l.Debug().Msg("Creating FIFO")
 	file, err := c.handleFifoCreate(fileCtx)
 	if err != nil {
