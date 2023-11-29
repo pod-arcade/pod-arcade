@@ -53,7 +53,7 @@ func main() {
 		NewDesktop().
 		WithVideoSource(
 			cmd_capture.NewCommandCaptureH264(
-				wf_recorder.NewScreenCapture(DesktopConfig.VIDEO_QUALITY, DesktopConfig.DISABLE_HW_ACCEL, DesktopConfig.VIDEO_PROFILE),
+				wf_recorder.NewScreenCapture(DesktopConfig.VIDEO_QUALITY, !DesktopConfig.DISABLE_HW_ACCEL, DesktopConfig.VIDEO_PROFILE),
 			)).
 		WithAudioSource(cmd_capture.NewCommandCaptureOgg(pulseaudio.NewGSTPulseAudioCapture())).
 		WithSignaler(mqtt.NewMQTTSignaler(mqtt.MQTTConfig{

@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/caarlos0/env/v9"
+	"github.com/caarlos0/env"
 	mqtt "github.com/mochi-mqtt/server/v2"
 	"github.com/mochi-mqtt/server/v2/hooks/auth"
 	"github.com/mochi-mqtt/server/v2/listeners"
