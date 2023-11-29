@@ -15,6 +15,7 @@ import (
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/uinput"
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/wayland"
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/wf_recorder"
+	"github.com/pod-arcade/pod-arcade/pkg/log"
 )
 
 var DesktopConfig struct {
@@ -31,6 +32,7 @@ var DesktopConfig struct {
 }
 
 func main() {
+	var logger = log.NewLogger("desktop", map[string]string{})
 	env.Parse(&DesktopConfig)
 	if DesktopConfig.DESKTOP_ID == "" {
 		hostname, err := os.Hostname()
@@ -39,6 +41,13 @@ func main() {
 		}
 		DesktopConfig.DESKTOP_ID = hostname
 	}
+	logger.Debug().Msgf("Starting Desktop with ID: %v", DesktopConfig.DESKTOP_ID)
+	logger.Debug().Msgf("\tMQTT_HOST: %v", DesktopConfig.MQTT_HOST)
+	logger.Debug().Msgf("\tVIDEO_QUALITY: %v", DesktopConfig.VIDEO_QUALITY)
+	logger.Debug().Msgf("\tVIDEO_PROFILE: %v", DesktopConfig.VIDEO_PROFILE)
+	logger.Debug().Msgf("\tHARDWARE_ACCELERATION: %v", !DesktopConfig.DISABLE_HW_ACCEL)
+	logger.Debug().Msgf("\tWEBRTC_PORT: %v (0 means auto discover them)", DesktopConfig.WEBRTC_PORT)
+	logger.Debug().Msgf("\tWEBRTC_IPS: %v", DesktopConfig.WEBRTC_IPS)
 
 	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt)
 
