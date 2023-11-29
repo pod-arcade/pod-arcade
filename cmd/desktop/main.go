@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/caarlos0/env"
 	"github.com/pion/webrtc/v4"
 	"github.com/pod-arcade/pod-arcade/internal/udev"
 	"github.com/pod-arcade/pod-arcade/pkg/desktop"
@@ -16,7 +17,26 @@ import (
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/wf_recorder"
 )
 
+var DesktopConfig struct {
+	MQTT_HOST   string `env:"MQTT_HOST" envDefault:"tcp://localhost:1883"`
+	DESKTOP_ID  string `env:"DESKTOP_ID"`
+	DESKTOP_PSK string `env:"DESKTOP_PSK"`
+
+	VIDEO_QUALITY    int    `env:"VIDEO_QUALITY" envDefault:"30"`
+	DISABLE_HW_ACCEL bool   `env:"DISABLE_HW_ACCEL" envDefault:"true"`
+	VIDEO_PROFILE    string `env:"VIDEO_PROFILE" envDefault:"constrained_baseline"`
+}
+
 func main() {
+	env.Parse(&DesktopConfig)
+	if DesktopConfig.DESKTOP_ID == "" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			panic(err)
+		}
+		DesktopConfig.DESKTOP_ID = hostname
+	}
+
 	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt)
 
 	// Open udev
@@ -33,13 +53,13 @@ func main() {
 		NewDesktop().
 		WithVideoSource(
 			cmd_capture.NewCommandCaptureH264(
-				wf_recorder.NewScreenCapture(30, true, "constrained_baseline"),
+				wf_recorder.NewScreenCapture(DesktopConfig.VIDEO_QUALITY, DesktopConfig.DISABLE_HW_ACCEL, DesktopConfig.VIDEO_PROFILE),
 			)).
 		WithAudioSource(cmd_capture.NewCommandCaptureOgg(pulseaudio.NewGSTPulseAudioCapture())).
 		WithSignaler(mqtt.NewMQTTSignaler(mqtt.MQTTConfig{
-			Host:       os.Getenv("MQTT_HOST"),
-			DesktopID:  os.Getenv("DESKTOP_ID"),
-			DesktopPSK: os.Getenv("DESKTOP_PSK"),
+			Host:       DesktopConfig.MQTT_HOST,
+			DesktopID:  DesktopConfig.DESKTOP_ID,
+			DesktopPSK: DesktopConfig.DESKTOP_PSK,
 		})).
 		WithGamepad(uinput.CreateVirtualGamepad(udev, 0, 0x045E, 0x02D1)).
 		WithGamepad(uinput.CreateVirtualGamepad(udev, 1, 0x045E, 0x02D1)).

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/caarlos0/env"
 	"github.com/pion/webrtc/v4"
 	"github.com/pod-arcade/pod-arcade/pkg/desktop"
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/cmd_capture"
@@ -12,7 +13,21 @@ import (
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/sample_recorder"
 )
 
+var DesktopConfig struct {
+	MQTT_HOST   string `env:"MQTT_HOST" envDefault:"tcp://localhost:1883"`
+	DESKTOP_ID  string `env:"DESKTOP_ID"`
+	DESKTOP_PSK string `env:"DESKTOP_PSK"`
+}
+
 func main() {
+	env.Parse(&DesktopConfig)
+	if DesktopConfig.DESKTOP_ID == "" {
+		hostname, err := os.Hostname()
+		if err != nil {
+			panic(err)
+		}
+		DesktopConfig.DESKTOP_ID = hostname
+	}
 	ctx, _ := signal.NotifyContext(context.Background(), os.Interrupt)
 
 	// Open udev
@@ -28,9 +43,9 @@ func main() {
 	d := desktop.
 		NewDesktop().
 		WithSignaler(mqtt.NewMQTTSignaler(mqtt.MQTTConfig{
-			Host:       os.Getenv("MQTT_HOST"),
-			DesktopID:  os.Getenv("DESKTOP_ID"),
-			DesktopPSK: os.Getenv("DESKTOP_PSK"),
+			Host:       DesktopConfig.MQTT_HOST,
+			DesktopID:  DesktopConfig.DESKTOP_ID,
+			DesktopPSK: DesktopConfig.DESKTOP_PSK,
 		})).
 		WithVideoSource(cmd_capture.NewCommandCaptureH264(&sample_recorder.SampleRecorder{}))
 
