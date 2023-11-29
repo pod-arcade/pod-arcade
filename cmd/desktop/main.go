@@ -35,7 +35,7 @@ func main() {
 			cmd_capture.NewCommandCaptureH264(
 				wf_recorder.NewScreenCapture(30, true, "constrained_baseline"),
 			)).
-		WithAudioSource(pulseaudio.NewPulseAudioCapture()).
+		WithAudioSource(cmd_capture.NewCommandCaptureOgg(pulseaudio.NewGSTPulseAudioCapture())).
 		WithSignaler(mqtt.NewMQTTSignaler(mqtt.MQTTConfig{
 			Host:       os.Getenv("MQTT_HOST"),
 			DesktopID:  os.Getenv("DESKTOP_ID"),
