@@ -19,15 +19,15 @@ func GetWebRTCAPI(d api.Desktop, c *WebRTCAPIConfig) (*webrtc.API, error) {
 	settingEngine := webrtc.SettingEngine{}
 
 	if c != nil {
+		if c.ExternalIPs != nil {
+			settingEngine.SetNAT1To1IPs(c.ExternalIPs, webrtc.ICECandidateTypeHost)
+		}
 		if c.SinglePort != 0 {
 			mux, err := ice.NewMultiUDPMuxFromPort(c.SinglePort)
 			if err != nil {
 				return nil, err
 			}
 			settingEngine.SetICEUDPMux(mux)
-		}
-		if c.ExternalIPs != nil {
-			settingEngine.SetNAT1To1IPs(c.ExternalIPs, webrtc.ICECandidateTypeSrflx)
 		}
 	}
 
