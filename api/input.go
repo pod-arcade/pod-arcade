@@ -233,3 +233,59 @@ func (i *GamepadRumble) FromBytes(input []byte) error {
 
 	return nil
 }
+
+// MouseInput describes the rumble settings for a gamepad.
+type MouseInput struct {
+	// Left represents the left mouse button
+	ButtonLeft bool
+	// Right represents the right mouse button
+	ButtonRight bool
+	// Middle represents the middle mouse button
+	ButtonMiddle bool
+
+	// Relative X velocity of mouse
+	MouseX float32
+	// Relative Y velocity of mouse
+	MouseY float32
+
+	// Relative X velocity of mouse wheel
+	WheelX float32
+	// Relative Y velocity of mouse wheel
+	WheelY float32
+}
+
+func (i *MouseInput) ToBytes() []byte {
+	output := make([]byte, 18)
+	output[0] = byte(InputTypeMouse)
+	d := output[1:]
+	d[0] = util.PackBits(i.ButtonLeft, i.ButtonRight, i.ButtonMiddle, false, false, false, false, false)
+	binary.LittleEndian.PutUint32(d[1:5], math.Float32bits(i.MouseX))
+	binary.LittleEndian.PutUint32(d[5:9], math.Float32bits(i.MouseY))
+	binary.LittleEndian.PutUint32(d[9:13], math.Float32bits(i.WheelX))
+	binary.LittleEndian.PutUint32(d[13:17], math.Float32bits(i.WheelY))
+
+	return output
+}
+
+func (i *MouseInput) FromBytes(input []byte) error {
+	if input[0] != byte(InputTypeMouse) || len(input) < 2 {
+		return errors.New("data is not a mouse input")
+	}
+
+	d := input[1:]
+	if len(d) != 17 {
+		return fmt.Errorf("invalid payload size %d should be 17 bytes", len(d))
+	}
+
+	left, right, middle, _, _, _, _, _ := util.UnpackBits(input[1])
+	i.ButtonLeft = left
+	i.ButtonRight = right
+	i.ButtonMiddle = middle
+
+	i.MouseX = math.Float32frombits(binary.LittleEndian.Uint32(d[1:5]))
+	i.MouseY = math.Float32frombits(binary.LittleEndian.Uint32(d[5:9]))
+	i.WheelX = math.Float32frombits(binary.LittleEndian.Uint32(d[9:13]))
+	i.WheelY = math.Float32frombits(binary.LittleEndian.Uint32(d[13:17]))
+
+	return nil
+}
