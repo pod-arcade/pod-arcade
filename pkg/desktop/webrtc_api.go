@@ -1,13 +1,35 @@
 package desktop
 
 import (
+	"github.com/pion/ice/v3"
 	"github.com/pion/interceptor"
 	"github.com/pion/webrtc/v4"
 	"github.com/pod-arcade/pod-arcade/api"
 	"github.com/pod-arcade/pod-arcade/pkg/desktop/webrtc_interceptors/nack"
 )
 
-func GetWebRTCAPI(d api.Desktop) (*webrtc.API, error) {
+type WebRTCAPIConfig struct {
+	SinglePort  int
+	ExternalIPs []string
+}
+
+// If the GetWebRTCAPI's second parameter is not set to 0, it will use a single port for all of the
+// WebRTC connections.
+func GetWebRTCAPI(d api.Desktop, c *WebRTCAPIConfig) (*webrtc.API, error) {
+	settingEngine := webrtc.SettingEngine{}
+
+	if c != nil {
+		if c.SinglePort != 0 {
+			mux, err := ice.NewMultiUDPMuxFromPort(c.SinglePort)
+			if err != nil {
+				return nil, err
+			}
+			settingEngine.SetICEUDPMux(mux)
+		}
+		if c.ExternalIPs != nil {
+			settingEngine.SetNAT1To1IPs(c.ExternalIPs, webrtc.ICECandidateTypeSrflx)
+		}
+	}
 
 	// Setup Media Engine
 	mediaEngine := &webrtc.MediaEngine{}
@@ -37,5 +59,7 @@ func GetWebRTCAPI(d api.Desktop) (*webrtc.API, error) {
 	mediaEngine.RegisterFeedback(webrtc.RTCPFeedback{Type: "nack", Parameter: ""}, webrtc.RTPCodecTypeVideo)
 
 	// Create WebRTC API
-	return webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine), webrtc.WithInterceptorRegistry(registry)), nil
+	api := webrtc.NewAPI(webrtc.WithMediaEngine(mediaEngine), webrtc.WithInterceptorRegistry(registry), webrtc.WithSettingEngine(settingEngine))
+
+	return api, nil
 }

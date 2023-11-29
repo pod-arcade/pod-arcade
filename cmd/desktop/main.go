@@ -25,6 +25,9 @@ var DesktopConfig struct {
 	VIDEO_QUALITY    int    `env:"VIDEO_QUALITY" envDefault:"30"`
 	DISABLE_HW_ACCEL bool   `env:"DISABLE_HW_ACCEL" envDefault:"true"`
 	VIDEO_PROFILE    string `env:"VIDEO_PROFILE" envDefault:"constrained_baseline"`
+
+	WEBRTC_PORT int      `env:"WEBRTC_PORT" envDefault:"0"`
+	WEBRTC_IPS  []string `env:"WEBRTC_IPS"`
 }
 
 func main() {
@@ -68,7 +71,10 @@ func main() {
 		WithMouse(wayland.NewWaylandInputClient(ctx))
 
 	// Register a webrtc API. Includes all of the codecs, interceptors, etc.
-	webrtcAPI, err := desktop.GetWebRTCAPI(d)
+	webrtcAPI, err := desktop.GetWebRTCAPI(d, &desktop.WebRTCAPIConfig{
+		SinglePort:  DesktopConfig.WEBRTC_PORT,
+		ExternalIPs: DesktopConfig.WEBRTC_IPS,
+	})
 	if err != nil {
 		panic(err)
 	}

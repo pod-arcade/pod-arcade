@@ -119,6 +119,7 @@ func (c *MQTTSignaler) Run(ctx context.Context, desktop api.Desktop) error {
 
 	// Wait for the done context
 	<-c.ctx.Done()
+	c.publishOfflineMessage() // last will doesn't fire on graceful disconnect
 
 	// If we're shutting down, disconnect the client.
 	c.Client.Disconnect(1000)
@@ -176,6 +177,10 @@ func (c *MQTTSignaler) getTopicPrefix() string {
 
 func (c *MQTTSignaler) publishOnlineMessage() {
 	c.Client.Publish(c.getTopicPrefix()+"/status", 0, true, "online")
+}
+
+func (c *MQTTSignaler) publishOfflineMessage() {
+	c.Client.Publish(c.getTopicPrefix()+"/status", 0, true, "offline")
 }
 
 func (c *MQTTSignaler) onOffer(sessionId api.SessionID, sdp webrtc.SessionDescription) {

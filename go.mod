@@ -10,6 +10,7 @@ require (
 	github.com/jfreymuth/pulse v0.1.0
 	github.com/lestrrat-go/jwx/v2 v2.0.15
 	github.com/mochi-mqtt/server/v2 v2.4.1
+	github.com/pion/ice/v3 v3.0.2
 	github.com/pion/interceptor v0.1.24
 	github.com/pion/logging v0.2.2
 	github.com/pion/rtcp v1.2.10
@@ -42,7 +43,6 @@ require (
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/pion/datachannel v1.5.5 // indirect
 	github.com/pion/dtls/v2 v2.2.7 // indirect
-	github.com/pion/ice/v3 v3.0.2 // indirect
 	github.com/pion/mdns v0.0.9 // indirect
 	github.com/pion/randutil v0.1.0 // indirect
 	github.com/pion/sctp v1.8.9 // indirect

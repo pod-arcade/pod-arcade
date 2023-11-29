@@ -17,6 +17,9 @@ var DesktopConfig struct {
 	MQTT_HOST   string `env:"MQTT_HOST" envDefault:"tcp://localhost:1883"`
 	DESKTOP_ID  string `env:"DESKTOP_ID"`
 	DESKTOP_PSK string `env:"DESKTOP_PSK"`
+
+	WEBRTC_PORT int      `env:"WEBRTC_PORT" envDefault:"0"`
+	WEBRTC_IPS  []string `env:"WEBRTC_IPS"`
 }
 
 func main() {
@@ -50,7 +53,10 @@ func main() {
 		WithVideoSource(cmd_capture.NewCommandCaptureH264(&sample_recorder.SampleRecorder{}))
 
 	// Register a webrtc API. Includes all of the codecs, interceptors, etc.
-	webrtcAPI, err := desktop.GetWebRTCAPI(d)
+	webrtcAPI, err := desktop.GetWebRTCAPI(d, &desktop.WebRTCAPIConfig{
+		SinglePort:  DesktopConfig.WEBRTC_PORT,
+		ExternalIPs: DesktopConfig.WEBRTC_IPS,
+	})
 	if err != nil {
 		panic(err)
 	}
