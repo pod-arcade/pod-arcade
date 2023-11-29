@@ -133,7 +133,7 @@ func (c *WaylandScreenCapture) GetProgramRunnerH264(file *os.File) (*util.Progra
 			"profile":        c.Profile,
 			"async_depth":    "1",
 			"global_quality": fmt.Sprint(c.Quality),
-			"gop_size":       "5",
+			"gop_size":       "30",
 			"open_gop":       "0",
 		}
 	} else {
@@ -152,7 +152,7 @@ func (c *WaylandScreenCapture) GetProgramRunnerH264(file *os.File) (*util.Progra
 			"profile":        c.Profile,
 			"async_depth":    "1",
 			"global_quality": fmt.Sprint(c.Quality),
-			"gop_size":       "5",
+			"gop_size":       "30",
 			"open_gop":       "0",
 		}
 	}
