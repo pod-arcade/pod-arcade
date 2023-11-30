@@ -1,6 +1,7 @@
 package cmd_capture
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"os"
@@ -86,7 +87,11 @@ func (c *CommandCaptureH264) handleH264Stream(ctx context.Context, stream io.Rea
 		return err
 	}
 	go func() {
+		var samples uint32 = 0
+		buffer := bytes.Buffer{}
+
 		for {
+			startOfFrame := false
 			select {
 			case <-ctx.Done():
 				return
@@ -100,14 +105,27 @@ func (c *CommandCaptureH264) handleH264Stream(ctx context.Context, stream io.Rea
 					c.l.Debug().Msg("NAL is nil, no more NALs available for reading")
 					return
 				}
-				pkts := pktizer.Packetize(nal.Data, 1)
-				for _, p := range pkts {
-					select {
-					case pktChan <- p:
-					default:
-						c.l.Warn().Msgf("Dropping RTP Packet of size %v", len(p.Payload))
-					}
+				if ((nal.Data[1] & 0x80) >> 7) == 1 {
+					// start of new batch of frames
+					startOfFrame = true
 				}
+
+				if startOfFrame && buffer.Len() > 0 {
+					// flush previous data
+					pkts := pktizer.Packetize(buffer.Bytes(), samples)
+					for _, p := range pkts {
+						select {
+						case pktChan <- p:
+						default:
+							c.l.Warn().Msgf("Dropping RTP Packet of size %v", len(p.Payload))
+						}
+					}
+					buffer = bytes.Buffer{}
+					samples = 0
+				}
+				samples++
+				buffer.Write([]byte{0x00, 0x00, 0x00, 0x01})
+				buffer.Write(nal.Data)
 			}
 		}
 	}()
