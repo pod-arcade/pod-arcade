@@ -151,6 +151,7 @@ func (c *MQTTSignaler) onConnect(client mqtt.Client) {
 			return
 		}
 		if c.sessions[api.SessionID(sessionId)] != nil {
+			c.l.Debug().Msgf("Remote ICE Candidate session=%v — %v", sessionId, candidate.Candidate)
 			c.sessions[api.SessionID(sessionId)].GetPeerConnection().AddICECandidate(candidate)
 		} else {
 			c.l.Error().Msgf("Received ICE Candidate for unknown session %v", sessionId)
@@ -186,10 +187,10 @@ func (c *MQTTSignaler) publishOfflineMessage() {
 func (c *MQTTSignaler) onOffer(sessionId api.SessionID, sdp webrtc.SessionDescription) {
 	c.l.Debug().Msgf("Received offer for session %v", sessionId)
 
-	var session api.Session
+	var session api.Session = c.sessions[sessionId]
 	var pc *webrtc.PeerConnection
 
-	if c.sessions[sessionId] == nil {
+	if session == nil {
 		c.l.Debug().Msgf("Creating new session %v", sessionId)
 		session = desktop.NewSession(c.ctx, sessionId)
 		c.sessions[sessionId] = session
@@ -209,10 +210,11 @@ func (c *MQTTSignaler) onOffer(sessionId api.SessionID, sdp webrtc.SessionDescri
 			}
 		})
 		pc.OnICECandidate(func(candidate *webrtc.ICECandidate) {
-			c.l.Debug().Msgf("Got ICE Candidate for session %v", sessionId)
 			if candidate == nil {
+				c.l.Debug().Msgf("Finished Gathering ICE Candidates for session %v", sessionId)
 				return
 			}
+			c.l.Debug().Msgf("Local  ICE Candidate session=%v — %v", sessionId, candidate.ToJSON().Candidate)
 			c.publishICECandidate(string(sessionId), candidate.ToJSON())
 		})
 	} else {

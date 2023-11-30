@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"os/signal"
 
@@ -29,11 +30,29 @@ var DesktopConfig struct {
 
 	WEBRTC_PORT int      `env:"WEBRTC_PORT" envDefault:"0"`
 	WEBRTC_IPS  []string `env:"WEBRTC_IPS"`
+
+	ICEServers     []webrtc.ICEServer `json:"-"`
+	ICEServersJSON string             `env:"ICE_SERVERS" envDefault:"" json:"-"`
+}
+
+var logger = log.NewLogger("desktop", map[string]string{})
+
+func configureICE() error {
+	if DesktopConfig.ICEServersJSON != "" {
+		err := json.Unmarshal([]byte(DesktopConfig.ICEServersJSON), &DesktopConfig.ICEServers)
+		if err != nil {
+			logger.Fatal().Msgf("Failed to decode ICE Servers, should be json array. %v", err)
+		}
+	}
+	return nil
 }
 
 func main() {
-	var logger = log.NewLogger("desktop", map[string]string{})
 	env.Parse(&DesktopConfig)
+	err := configureICE()
+	if err != nil {
+		panic(err)
+	}
 	if DesktopConfig.DESKTOP_ID == "" {
 		hostname, err := os.Hostname()
 		if err != nil {
@@ -89,7 +108,9 @@ func main() {
 	}
 
 	// Get the webrtc API with registered NACKs and Interceptors.
-	d.WithWebRTCAPI(webrtcAPI, &webrtc.Configuration{})
+	d.WithWebRTCAPI(webrtcAPI, &webrtc.Configuration{
+		ICEServers: DesktopConfig.ICEServers,
+	})
 
 	// Run the desktop
 	d.Run(ctx)
