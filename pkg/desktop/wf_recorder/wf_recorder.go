@@ -129,7 +129,6 @@ func (c *WaylandScreenCapture) GetProgramRunnerH264(file *os.File) (*util.Progra
 			"-r", "60",
 			"-m", "h264",
 			"-f", file.Name(),
-			"-x", "yuv420p",
 		}
 
 		properties = map[string]string{
@@ -140,6 +139,9 @@ func (c *WaylandScreenCapture) GetProgramRunnerH264(file *os.File) (*util.Progra
 			"global_quality": fmt.Sprint(c.Quality),
 			"gop_size":       "30",
 			"open_gop":       "0",
+			"slice-max-size": "1200",
+			"slices":         "1",
+			"forced-idr":     "1",
 		}
 	} else {
 		if c.Profile == "constrained_baseline" {
@@ -152,6 +154,7 @@ func (c *WaylandScreenCapture) GetProgramRunnerH264(file *os.File) (*util.Progra
 			"-r", "60",
 			"-m", "h264",
 			"-f", file.Name(),
+			"-x", "yuv420p",
 		}
 
 		properties = map[string]string{
@@ -162,6 +165,9 @@ func (c *WaylandScreenCapture) GetProgramRunnerH264(file *os.File) (*util.Progra
 			"global_quality": fmt.Sprint(c.Quality),
 			"gop_size":       "30",
 			"open_gop":       "0",
+			"slice-max-size": "1200",
+			"slices":         "1",
+			"forced-idr":     "1",
 		}
 	}
 

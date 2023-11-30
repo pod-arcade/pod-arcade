@@ -86,6 +86,7 @@ func (c *CommandCaptureH264) handleH264Stream(ctx context.Context, stream io.Rea
 		return err
 	}
 	go func() {
+		nalBuffer := []byte{}
 		for {
 			select {
 			case <-ctx.Done():
@@ -100,14 +101,22 @@ func (c *CommandCaptureH264) handleH264Stream(ctx context.Context, stream io.Rea
 					c.l.Debug().Msg("NAL is nil, no more NALs available for reading")
 					return
 				}
-				pkts := pktizer.Packetize(nal.Data, 1)
-				for _, p := range pkts {
-					select {
-					case pktChan <- p:
-					default:
-						c.l.Warn().Msgf("Dropping RTP Packet of size %v", len(p.Payload))
+
+				startOfFrame := ((nal.Data[1] & 0x80) >> 7) == 1
+				if startOfFrame {
+					pkts := pktizer.Packetize(nalBuffer, 1)
+					for _, p := range pkts {
+						select {
+						case pktChan <- p:
+						default:
+							c.l.Warn().Msgf("Dropping RTP Packet of size %v", len(p.Payload))
+						}
 					}
+					nalBuffer = []byte{}
 				}
+
+				nalBuffer = append(nalBuffer, []byte{0x00, 0x00, 0x00, 0x01}...)
+				nalBuffer = append(nalBuffer, nal.Data...)
 			}
 		}
 	}()
