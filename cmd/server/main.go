@@ -20,6 +20,7 @@ import (
 	"github.com/pod-arcade/pod-arcade/pkg/server/handlers"
 	"github.com/pod-arcade/pod-arcade/pkg/server/hooks"
 	palisteners "github.com/pod-arcade/pod-arcade/pkg/server/listeners"
+	"github.com/pod-arcade/pod-arcade/pkg/server/stun"
 	"github.com/pod-arcade/pod-arcade/pkg/util"
 )
 
@@ -42,6 +43,8 @@ var ServerConfig struct {
 	TLSPort  int    `env:"TLS_PORT" envDefault:"8443" json:"-"`
 	TLSKey   string `env:"TLS_KEY" envDefault:"" json:"-"`
 	TLSCert  string `env:"TLS_CERT" envDefault:"" json:"-"`
+
+	StunPort int `env:"STUN_PORT" envDefault:"-1"`
 }
 
 func init() {
@@ -67,6 +70,16 @@ func publishICEServers(server *mqtt.Server) {
 func main() {
 	// Create signals channel to run server until interrupted
 	ctx, _ := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+
+	// Start STUN server
+	if ServerConfig.StunPort > 0 {
+		go func() {
+			err := stun.StartStunServer(ctx, ServerConfig.StunPort)
+			if err != nil {
+				log.Fatal(err)
+			}
+		}()
+	}
 
 	// Create the new MQTT Server.
 	server := mqtt.New(&mqtt.Options{

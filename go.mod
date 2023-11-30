@@ -15,6 +15,7 @@ require (
 	github.com/pion/logging v0.2.2
 	github.com/pion/rtcp v1.2.10
 	github.com/pion/rtp v1.8.2
+	github.com/pion/stun v0.6.1
 	github.com/pion/webrtc/v4 v4.0.0-beta.6
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
