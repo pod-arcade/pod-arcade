@@ -77,6 +77,9 @@ func (c *WaylandScreenCapture) GetProgramRunnerUDP(addr net.UDPAddr) (*util.Prog
 			"slices":         "2",
 		}
 	} else {
+		if c.Profile == "constrained_baseline" {
+			c.Profile = "baseline"
+		}
 		// No hardware acceleration
 		args = []string{
 			"-c", "libx264",
@@ -84,6 +87,7 @@ func (c *WaylandScreenCapture) GetProgramRunnerUDP(addr net.UDPAddr) (*util.Prog
 			"-r", "60",
 			"-m", "rtp",
 			"-f", udpAddr,
+			"-x", "yuv420p",
 		}
 
 		properties = map[string]string{
@@ -125,6 +129,7 @@ func (c *WaylandScreenCapture) GetProgramRunnerH264(file *os.File) (*util.Progra
 			"-r", "60",
 			"-m", "h264",
 			"-f", file.Name(),
+			"-x", "yuv420p",
 		}
 
 		properties = map[string]string{
@@ -137,6 +142,9 @@ func (c *WaylandScreenCapture) GetProgramRunnerH264(file *os.File) (*util.Progra
 			"open_gop":       "0",
 		}
 	} else {
+		if c.Profile == "constrained_baseline" {
+			c.Profile = "baseline"
+		}
 		// No hardware acceleration
 		args = []string{
 			"-c", "libx264",
