@@ -64,8 +64,8 @@ docker run -it --rm --user 0 --privileged --link pa-server:pa-server \
   -e WLR_NO_HARDWARE_CURSORS='1' \
   -e WLR_RENDERER=gles2 \
   -e XDG_RUNTIME_DIR=/tmp/sway \
-  -v /dev/dri:/dev/host-dri \
-  -v /dev/uinput:/dev/uinput \
+  -v /dev/dri:/host/dev/dri \
+  -v /dev/uinput:/host/dev/uinput \
   -v pa-desktop-dri:/dev/dri \
  ghcr.io/pod-arcade/desktop:main
 ```
