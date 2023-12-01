@@ -25,6 +25,13 @@ type WaylandInputClient struct {
 	keyboard        *wlr_virtual_keyboard.ZwpVirtualKeyboardV1
 	sync.Once
 
+	// last known state of the mouse buttons
+	state struct {
+		lmb bool // left mouse button
+		mmb bool // middle mouse button
+		rmb bool // right mouse button
+	}
+
 	mtx sync.RWMutex
 	ctx context.Context
 	l   zerolog.Logger
@@ -111,6 +118,9 @@ func (c *WaylandInputClient) Open() error {
 func (c *WaylandInputClient) MoveMouse(dx, dy float64) error {
 	c.mtx.RLock()
 	defer c.mtx.RUnlock()
+	if dx == 0 && dy == 0 {
+		return nil
+	}
 	if c.pointer != nil {
 		c.l.Debug().Msgf("Moving Mouse by (%v,%v)", dx, dy)
 		err := c.pointer.Motion(uint32(time.Now().UnixMilli()), dx, dy)
@@ -159,14 +169,26 @@ func (c *WaylandInputClient) SetMouseButton(btn uint32, state bool) error {
 }
 func (c *WaylandInputClient) SetMouseButtonRight(state bool) error {
 	// #define BTN_RIGHT		0x111
+	if c.state.rmb == state {
+		return nil
+	}
+	c.state.rmb = state
 	return c.SetMouseButton(0x111, state)
 }
 func (c *WaylandInputClient) SetMouseButtonLeft(state bool) error {
 	// #define BTN_LEFT		0x110
+	if c.state.lmb == state {
+		return nil
+	}
+	c.state.lmb = state
 	return c.SetMouseButton(0x110, state)
 }
 func (c *WaylandInputClient) SetMouseButtonMiddle(state bool) error {
 	// #define BTN_MIDDLE		0x112
+	if c.state.mmb == state {
+		return nil
+	}
+	c.state.mmb = state
 	return c.SetMouseButton(0x112, state)
 }
 func (c *WaylandInputClient) SetKeyboardKey(vk int, state bool) error {

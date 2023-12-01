@@ -202,14 +202,14 @@ func (d *Desktop) HandleSession(s api.Session) error {
 }
 
 func (d *Desktop) Run(ctx context.Context) error {
+	d.l.Debug().Msg("Starting Desktop...")
 	if d.webrtcAPI == nil {
 		d.webrtcAPI = webrtc.NewAPI()
 	}
 
-	wg := sync.WaitGroup{}
-
 	// Start Gamepads
 	for _, g := range d.gamepads {
+		d.l.Debug().Msgf("Opening Gamepad — %v...", g.GetName())
 		err := g.OpenGamepad()
 		if err != nil {
 			return err
@@ -219,6 +219,7 @@ func (d *Desktop) Run(ctx context.Context) error {
 
 	// Start Keyboard
 	if d.keyboard != nil {
+		d.l.Debug().Msgf("Opening Keyboard — %v...", d.keyboard.GetName())
 		err := d.keyboard.Open()
 		if err != nil {
 			return err
@@ -228,6 +229,7 @@ func (d *Desktop) Run(ctx context.Context) error {
 
 	// Start Mouse
 	if d.mouse != nil {
+		d.l.Debug().Msgf("Opening Mouse — %v...", d.mouse.GetName())
 		err := d.mouse.Open()
 		if err != nil {
 			return err
@@ -236,7 +238,9 @@ func (d *Desktop) Run(ctx context.Context) error {
 	}
 
 	// Register Signalers
+	wg := sync.WaitGroup{}
 	for _, s := range d.signalers {
+		d.l.Debug().Msgf("Registering signaler — %v...", s.GetName())
 		// Start the signaler with the context
 		s.SetNewSessionHandler(d.HandleSession)
 		wg.Add(1)
@@ -246,12 +250,15 @@ func (d *Desktop) Run(ctx context.Context) error {
 		}(s)
 	}
 
+	d.l.Debug().Msg("Starting Mixer...")
 	err := d.mixer.Stream(ctx)
 
 	// Wait for all of our signalers to shut down
 	// no matter whether we had an error streaming or not.
 	// we need them to clean up first
+	d.l.Debug().Msg("Desktop running!")
 	wg.Wait()
+	d.l.Debug().Msg("Desktop shutting down...")
 
 	return err
 }
