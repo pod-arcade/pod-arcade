@@ -3,6 +3,7 @@ package uinput
 import (
 	"errors"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -31,6 +32,7 @@ type VirtualGamepad struct {
 	joystickDevice udev.Device
 
 	busy sync.Mutex
+	once sync.Once
 }
 
 func CreateVirtualGamepad(ud *udev.UDev, gamepadId int, vendorId int16, productId int16) *VirtualGamepad {
@@ -56,6 +58,19 @@ func (gp *VirtualGamepad) SetGamepadRumbleHandler(handler api.GamepadRumbleHandl
 }
 
 func (gp *VirtualGamepad) OpenGamepad() error {
+	_, err := os.Stat("/dev/uinput")
+	if err != nil {
+		if os.IsNotExist(err) {
+			gp.l.Error().Err(err).Msg("uinput device does not exist. Skipping controller create.")
+			return nil
+		} else if os.IsPermission(err) {
+			gp.l.Error().Err(err).Msg("insufficient permissions to access uinput device. Skipping controller create.")
+			return nil
+		} else {
+			return err
+		}
+	}
+
 	gamepadName := fmt.Sprintf("[PA] Gamepad %v", gp.gamepadId)
 
 	// register Udev listeners to create our devices
@@ -180,6 +195,12 @@ func (pad *VirtualGamepad) setButtonState(key int, pressed bool) {
 }
 
 func (pad *VirtualGamepad) SetGamepadInputState(state api.GamepadInput) error {
+	if pad.gamepad == nil {
+		pad.once.Do(func() {
+			pad.l.Warn().Msg("Received input for gamepad, but no gamepad exists. Ignoring all future input.")
+		})
+		return nil
+	}
 	pad.setButtonState(uinput.ButtonNorth, state.North)
 	pad.setButtonState(uinput.ButtonSouth, state.South)
 	pad.setButtonState(uinput.ButtonWest, state.West)
@@ -210,8 +231,13 @@ func (pad *VirtualGamepad) Close() error {
 	for _, l := range pad.udevListeners {
 		pad.udev.KernelEvents.RemoveListener("ADD", l)
 	}
-	return errors.Join(
-		pad.eventDevice.Close(),
-		pad.joystickDevice.Close(),
-	)
+	if pad.gamepad != nil {
+		// we only need to close these things if they were ever opened.
+		return errors.Join(
+			pad.eventDevice.Close(),
+			pad.joystickDevice.Close(),
+			pad.gamepad.Close(),
+		)
+	}
+	return nil
 }
