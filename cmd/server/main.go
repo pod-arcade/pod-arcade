@@ -38,13 +38,13 @@ var ServerConfig struct {
 	RequireAuth    bool               `env:"AUTH_REQUIRED" envDefault:"false" json:"-"`
 
 	HTTPPort int `env:"HTTP_PORT" envDefault:"8080" json:"-"`
+	MQTTPort int `env:"MQTT_PORT" envDefault:"8080" json:"-"`
+	TLSPort  int `env:"TLS_PORT" envDefault:"8443" json:"-"`
 
-	ServeTLS bool   `env:"SERVE_TLS" envDefault:"false" json:"-"`
-	TLSPort  int    `env:"TLS_PORT" envDefault:"8443" json:"-"`
-	TLSKey   string `env:"TLS_KEY" envDefault:"" json:"-"`
-	TLSCert  string `env:"TLS_CERT" envDefault:"" json:"-"`
+	TLSKey  string `env:"TLS_KEY" envDefault:"" json:"-"`
+	TLSCert string `env:"TLS_CERT" envDefault:"" json:"-"`
 
-	StunPort int `env:"STUN_PORT" envDefault:"-1"`
+	StunPort int `env:"STUN_PORT" envDefault:"-1" json:"-"`
 }
 
 func init() {
@@ -71,8 +71,12 @@ func main() {
 	// Create signals channel to run server until interrupted
 	ctx, _ := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 
+	if ServerConfig.MQTTPort == -1 && ServerConfig.HTTPPort == -1 && ServerConfig.TLSPort == -1 && ServerConfig.StunPort == -1 {
+		log.Fatal("No ports configured to listen on")
+	}
+
 	// Start STUN server
-	if ServerConfig.StunPort > 0 {
+	if ServerConfig.StunPort != -1 {
 		go func() {
 			err := stun.StartStunServer(ctx, ServerConfig.StunPort)
 			if err != nil {
@@ -131,21 +135,23 @@ func main() {
 	_ = server.AddHook(hooks.NewClearRetainedHook(server), nil)
 
 	// Create a TCP listener on a standard port.
-	tcp := listeners.NewTCP("tcp1", ":1883", nil)
-	err := server.AddListener(tcp)
-	if err != nil {
-		log.Fatal(err)
+	if ServerConfig.MQTTPort != -1 {
+		tcp := listeners.NewTCP("tcp1", ":1883", nil)
+		err := server.AddListener(tcp)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
+
+	// Start setting up a HTTP Listener
+	mux := http.NewServeMux()
 
 	// Create a WebRTC listener on a standard port.
 	ws := palisteners.NewWebsocket("ws1")
-	err = server.AddListener(ws)
+	err := server.AddListener(ws)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	mux := http.NewServeMux()
-
 	mux.HandleFunc("/mqtt", ws.Handler)
 
 	// load static content embedded in the app
@@ -179,13 +185,15 @@ func main() {
 		}
 	}()
 
-	go func() {
-		server.Log.Info(fmt.Sprintf("Serving HTTP on port %v", ServerConfig.HTTPPort))
-		if err := http.ListenAndServe(fmt.Sprintf("0.0.0.0:%v", ServerConfig.HTTPPort), mux); err != nil {
-			panic(err)
-		}
-	}()
-	if ServerConfig.ServeTLS {
+	if ServerConfig.HTTPPort != -1 {
+		go func() {
+			server.Log.Info(fmt.Sprintf("Serving HTTP on port %v", ServerConfig.HTTPPort))
+			if err := http.ListenAndServe(fmt.Sprintf("0.0.0.0:%v", ServerConfig.HTTPPort), mux); err != nil {
+				panic(err)
+			}
+		}()
+	}
+	if ServerConfig.TLSPort != -1 {
 		go func() {
 			s := http.Server{
 				Addr:    fmt.Sprintf("0.0.0.0:%v", ServerConfig.TLSPort),

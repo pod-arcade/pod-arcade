@@ -46,7 +46,7 @@ func NewWebsocket(id string) *Websocket {
 
 // ID returns the id of the listener.
 func (l *Websocket) Address() string {
-	return ""
+	return "ServerEmbedded"
 }
 
 // ID returns the id of the listener.
