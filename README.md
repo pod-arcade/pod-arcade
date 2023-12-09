@@ -71,7 +71,7 @@ The following example runs an "all-in-one" desktop image that bundles the deskto
 # - DESKTOP_PSK: Pre-shared key for desktop authentication. This should match the DESKTOP_PSK on the server.
 #
 docker run -it --rm --user 0 --privileged  \
-  -e MQTT_HOST="ws://10.0.0.8:8080/mqtt" \
+  -e MQTT_HOST="ws://localhost:8080/mqtt" \
   -e DESKTOP_ID=example-yuzu \
   -e DESKTOP_PSK="theMagicStringUsedToAuthenticateDesktops" \
 4  -v /dev/dri:/host/dev/dri \
