@@ -80,6 +80,9 @@ func main() {
 
 	// Create Desktop
 	// Register all of the inputs, video sources, audio sources, and signalers.
+
+	wc := wayland.NewWaylandInputClient(ctx)
+
 	d := desktop.
 		NewDesktop().
 		WithVideoSource(
@@ -96,7 +99,8 @@ func main() {
 		WithGamepad(uinput.CreateVirtualGamepad(udev, 1, 0x045E, 0x02D1)).
 		WithGamepad(uinput.CreateVirtualGamepad(udev, 2, 0x045E, 0x02D1)).
 		WithGamepad(uinput.CreateVirtualGamepad(udev, 3, 0x045E, 0x02D1)).
-		WithMouse(wayland.NewWaylandInputClient(ctx))
+		WithMouse(wc).
+		WithKeyboard(wc)
 
 	// Register a webrtc API. Includes all of the codecs, interceptors, etc.
 	webrtcAPI, err := desktop.GetWebRTCAPI(d, &desktop.WebRTCAPIConfig{
