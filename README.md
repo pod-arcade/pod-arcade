@@ -12,13 +12,14 @@ It is designed to be deployed on Kubernetes, but can also be deployed using Dock
 
 There are two major components to Pod-Arcade:
 
-* The Pod-Arcade Server — an MQTT server manages the game streaming sessions. Desktops and web browsers connect to this server in order to stream games.
+* The Pod-Arcade Server — an HTTP/MQTT server that manages the game streaming sessions. Desktops and web browsers connect to this server in order to stream games.
 
 * The Pod-Arcade Desktop — a desktop application that runs on Wayland and streams games to the Pod-Arcade Server.
 
 ## Getting Started
 
 If you just want to get something up and running quicky, you have a few different options.
+If you're looking for a more permanent setup, be sure to visit the docs on our website: https://pod-arcade.com
 
 ### Helm
 
@@ -26,56 +27,61 @@ We provide some reference helm charts for deploying Pod-Arcade on Kubernetes, at
 
 ### Docker
 
-Run the server with this. You should be able to connect using https://localhost:8443. You may need to accept the self-signed certificate.
+#### Server
+You should be able to connect using https://localhost:8443. You may need to accept the self-signed certificate.
 If that doesn't work, you may need to generate your own certificate and key, add that to your trust store, mount it into the container, and set the `TLS_CERT` and `TLS_KEY` environment variables to the path you mounted them to. Alternatively, [chrome has a flag that will allow you to ignore invalid certificates on localhost](chrome://flags/#allow-insecure-localhost).
 
 ```bash
+# Mapping ports: 
+# - 1883 for MQTT (not needed, but useful for debugging)
+# - 8080 for HTTP
+# - 8443 for HTTPS (probably what your browser needs to connect to)
+#
+# Setting environment variables for authentication and configuration:
+# - AUTH_REQUIRED: Enable authentication. If you set this to false, you can skip the PSK environment variables.
+# - DESKTOP_PSK: Pre-shared key for desktop authentication
+# - CLIENT_PSK: Pre-shared key for client (browser) connections
+# - ICE_SERVERS: STUN server configuration for WebRTC. The browser will use this to find the best route to the desktop.
+# - SERVE_TLS: Enable TLS (HTTPS)
+#
 docker run -it --rm --name pa-server \
   -p 1883:1883 \
   -p 8080:8080 \
   -p 8443:8443 \
+  -e AUTH_REQUIRED="true" \
   -e DESKTOP_PSK="theMagicStringUsedToAuthenticateDesktops" \
   -e CLIENT_PSK="thePasswordUsersPutInToConnect" \
-  -e ICE_SERVERS='[{"urls":["stun:stun.l.google.com:19302"]}' \
-  -e AUTH_REQUIRED="true" \
+  -e ICE_SERVERS='[{"urls":["stun:stun.l.google.com:19302"]}]' \
   -e SERVE_TLS="true" \
  ghcr.io/pod-arcade/server:main
 ```
 
-and run an example retroarch client with:
+#### Client
+
+The following example runs an "all-in-one" desktop image that bundles the desktop binary, and the yuzu emulator.
 
 ```bash
-docker volume create pa-desktop-dri
-docker run -it --rm --user 0 --privileged --link pa-server:pa-server \
-  -e WAYLAND_DISPLAY=wayland-1 \
-  -e MQTT_HOST="ws://pa-server:8080/mqtt" \
-  -e DESKTOP_ID=example-retroarch \
+# Volume Mappings: 
+# - /dev/dri:/host/dev/dri is to enable hardware acceleration
+# - /dev/uinput:/host/dev/uinput is to enable gamepad support
+#
+# Setting environment variables for authentication and configuration:
+# - MQTT_HOST: This is the URL of the Pod-Arcade server. It can be ws://host:8080/mqtt. If you're using TLS with a valid (not self-signed) certificate, it should be wss://host:8443/mqtt
+# - DESKTOP_ID: This is the identifier for this desktop. It should be [a-z0-9-]+.
+# - DESKTOP_PSK: Pre-shared key for desktop authentication. This should match the DESKTOP_PSK on the server.
+#
+docker run -it --rm --user 0 --privileged  \
+  -e MQTT_HOST="ws://10.0.0.8:8080/mqtt" \
+  -e DESKTOP_ID=example-yuzu \
   -e DESKTOP_PSK="theMagicStringUsedToAuthenticateDesktops" \
-  -e DISABLE_HW_ACCEL='false' \
-  -e DISPLAY=':0' \
-  -e DRI_DEVICE_MODE=MKNOD \
-  -e FFMPEG_HARDWARE='1' \
-  -e PGID='1000' \
-  -e PUID='1000' \
-  -e PULSE_SERVER='unix:/tmp/pulse/pulse-socket' \
-  -e UINPUT_DEVICE_MODE=NONE \
-  -e UNAME=ubuntu \
-  -e WLR_BACKENDS=headless \
-  -e WLR_NO_HARDWARE_CURSORS='1' \
-  -e WLR_RENDERER=gles2 \
-  -e XDG_RUNTIME_DIR=/tmp/sway \
-  -v /dev/dri:/host/dev/dri \
+4  -v /dev/dri:/host/dev/dri \
   -v /dev/uinput:/host/dev/uinput \
-  -v pa-desktop-dri:/dev/dri \
- ghcr.io/pod-arcade/desktop:main
+ ghcr.io/pod-arcade/example-yuzu-aio:main
 ```
 
 ### Docker Compose
 
 There's docker-compose for running desktops in [pod-arcade/example-apps](https://github.com/pod-arcade/example-apps)
-
-You'll need to set some of the environment variables to have it connect to the Pod-Arcade server. Just be careful which example applications you look at. Many of those pod-arcade/example-apps simply use the built in VNC server to stream the desktop to the browser, not Pod-Arcade. That's because it's much faster to do development that way, and will be compatible with pod-arcade if the VNC approach works.
-
 
 ## Screenshots
 

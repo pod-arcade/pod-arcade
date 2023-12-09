@@ -3,7 +3,9 @@ package wayland
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/pod-arcade/pod-arcade/api"
@@ -23,6 +25,7 @@ type WaylandInputClient struct {
 	pointer         *wlr_virtual_pointer.ZwlrVirtualPointerV1
 	keyboardManager *wlr_virtual_keyboard.ZwpVirtualKeyboardManagerV1
 	keyboard        *wlr_virtual_keyboard.ZwpVirtualKeyboardV1
+	seat            *client.Seat
 	sync.Once
 
 	// last known state of the mouse buttons
@@ -84,7 +87,7 @@ func (c *WaylandInputClient) Open() error {
 
 	c.l.Debug().Msgf("...Creating virtual pointer")
 	if c.pointerManager != nil {
-		mouse, err := c.pointerManager.CreateVirtualPointer(nil)
+		mouse, err := c.pointerManager.CreateVirtualPointer(c.seat)
 		if err != nil {
 			return err
 		}
@@ -95,23 +98,83 @@ func (c *WaylandInputClient) Open() error {
 		c.l.Debug().Msgf("...display does not support virtual pointer")
 		return fmt.Errorf("display does not support virtual pointers")
 	}
-	// TODO: Need to actually get a seat. Seats may be optional for mice, but not keyboards.
-	// c.l.Debug().Msgf("...Creating virtual keyboard")
-	// if c.pointerManager != nil {
-	// 	keyboard, err := c.keyboardManager.CreateVirtualKeyboard(nil)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	c.l.Debug().Msgf("...Created virtual keyboard")
 
-	// 	c.keyboard = keyboard
-	// } else {
-	// 	c.l.Debug().Msgf("...display does not support virtual keyboards")
-	// 	return fmt.Errorf("display does not support virtual keyboards")
-	// }
+	// TODO: Need to actually get a seat. Seats may be optional for mice, but not keyboards.
+	c.l.Debug().Msgf("...Creating virtual keyboard")
+	if c.keyboardManager != nil {
+		keyboard, err := c.keyboardManager.CreateVirtualKeyboard(c.seat)
+		if err != nil {
+			return err
+		}
+		c.l.Debug().Msgf("...Created virtual keyboard")
+		c.keyboard = keyboard
+	} else {
+		c.l.Debug().Msgf("...display does not support virtual keyboards")
+		return fmt.Errorf("display does not support virtual keyboards")
+	}
 	c.l.Debug().Msgf("...Waiting for Final Display Sync")
+	err := c.CreateKeymap()
+	if err != nil {
+		return err
+	}
 	c.WaitForDisplaySync() // Wait for events to be called
 
+	return nil
+}
+
+// This blog post explains basically everything
+// https://medium.com/@damko/a-simple-humble-but-comprehensive-guide-to-xkb-for-linux-6f1ad5e13450
+// https://way-cooler.org/docs/wlroots/enum.wlr_keyboard_modifier.html explains modifier keys
+func (c *WaylandInputClient) CreateKeymap() error {
+	// Define your keymap data (this is a simplified example)
+	keymapData := `
+	xkb_keymap {
+    xkb_keycodes  { include "evdev+aliases(qwerty)" };
+    xkb_types     { include "complete" };
+    xkb_compat    { include "complete" };
+    xkb_symbols   { include "pc+us+inet(evdev)" };
+    xkb_geometry  { include "pc(pc105)" };
+};
+`
+
+	// Create a temporary file for the keymap
+	keymapFile, err := os.CreateTemp(os.TempDir(), "keymap-")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file for keymap: %v", err)
+	}
+	defer keymapFile.Close()
+
+	// Write the keymap data to the file
+	_, err = keymapFile.WriteString(keymapData)
+	if err != nil {
+		return fmt.Errorf("failed to write to keymap file: %v", err)
+	}
+
+	// Get the file size for the keymap
+	fileInfo, err := keymapFile.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat keymap file: %v", err)
+	}
+	size := uint32(fileInfo.Size())
+
+	// Get the file descriptor
+	fd := int(keymapFile.Fd())
+
+	// Duplicate the file descriptor to keep it open after passing to Wayland
+	dupFd, err := syscall.Dup(fd)
+	if err != nil {
+		return fmt.Errorf("failed to duplicate file descriptor: %v", err)
+	}
+
+	// Now pass the file descriptor and size to Wayland
+	// 0x01 is the xkb format, which is currently the only format supported
+	error := c.keyboard.Keymap(0x01, dupFd, size)
+	if error != nil {
+		return fmt.Errorf("failed to set keymap: %v", err)
+	}
+
+	// The file descriptor dupFd should not be closed here, as Wayland will use it.
+	// It will be closed automatically when the Wayland server reads it.
 	return nil
 }
 
@@ -191,9 +254,11 @@ func (c *WaylandInputClient) SetMouseButtonMiddle(state bool) error {
 	c.state.mmb = state
 	return c.SetMouseButton(0x112, state)
 }
+
 func (c *WaylandInputClient) SetKeyboardKey(vk int, state bool) error {
 	c.mtx.RLock()
 	defer c.mtx.RUnlock()
+	c.l.Debug().Msgf("Setting Keyboard Key %v to %v", vk, state)
 	if c.keyboard != nil {
 		stateInt := uint32(0)
 		if state {
@@ -228,6 +293,15 @@ func (c *WaylandInputClient) GlobalRegistryHandler(evt client.RegistryGlobalEven
 			panic(err)
 		} else {
 			c.l.Debug().Msgf("Bound zwp_virtual_keyboard_manager_v1")
+		}
+	case "wl_seat":
+		c.seat = client.NewSeat(c.display.Context())
+		err := c.registry.Bind(evt.Name, evt.Interface, evt.Version, c.seat)
+		if err != nil {
+			c.l.Error().Msgf("Unable to bind wl_seat: %v", err)
+			panic(err)
+		} else {
+			c.l.Debug().Msgf("Bound wl_seat")
 		}
 	}
 }
@@ -302,6 +376,14 @@ func (c *WaylandInputClient) Close() error {
 			c.l.Debug().Msgf("Unable to destroy keyboardManager")
 		} else {
 			c.keyboardManager = nil
+		}
+	}
+
+	if c.seat != nil {
+		if err := c.seat.Release(); err != nil {
+			c.l.Debug().Msgf("Unable to release seat")
+		} else {
+			c.seat = nil
 		}
 	}
 
