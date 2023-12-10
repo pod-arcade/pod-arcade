@@ -323,7 +323,7 @@ func (i *KeyboardInput) ToBytes() []byte {
 }
 
 func (i *KeyboardInput) FromBytes(input []byte) error {
-	if input[0] != byte(InputTypeMouse) || len(input) < 2 {
+	if input[0] != byte(InputTypeKeyboard) || len(input) < 2 {
 		return errors.New("data is not a keyboard input")
 	}
 
