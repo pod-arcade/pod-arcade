@@ -114,15 +114,24 @@ func (d *Desktop) HandleInputMessage(data []byte) {
 
 	switch api.InputType(data[0]) {
 	case api.InputTypeKeyboard:
+		input := api.KeyboardInput{}
+		err := input.FromBytes(data)
+		if err != nil {
+			d.l.Warn().Err(err).Msg("Failed to parse keyboard input")
+			return
+		}
+		d.l.Debug().Msgf("Handling keyboard input %v", input)
+		if err := d.keyboard.SetKeyboardKey(input); err != nil {
+			d.l.Warn().Err(err).Msg("Failed to set keyboard key")
+		}
 	case api.InputTypeMouse:
 		input := api.MouseInput{}
 		err := input.FromBytes(data)
 		if err != nil {
 			d.l.Warn().Err(err).Msg("Failed to parse mouse input")
 			return
-		} else {
-			d.l.Debug().Msgf("Handling mouse input %v", input)
 		}
+		d.l.Debug().Msgf("Handling mouse input %v", input)
 		d.mouse.SetMouseButtonLeft(input.ButtonLeft)
 		d.mouse.SetMouseButtonRight(input.ButtonRight)
 		d.mouse.SetMouseButtonMiddle(input.ButtonMiddle)

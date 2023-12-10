@@ -289,3 +289,51 @@ func (i *MouseInput) FromBytes(input []byte) error {
 
 	return nil
 }
+
+// KeyboardInputModifiers describes the state of the modifier keys on a keyboard.
+type KeyboardInputModifiers struct {
+	Shift bool
+	Alt   bool
+	Ctrl  bool
+	Meta  bool
+	Caps  bool
+}
+
+// KeyboardInput describes the state of a keyboard's inputs.
+type KeyboardInput struct {
+	// embed modifier Keys
+	KeyboardInputModifiers
+
+	// down = true
+	// up = false
+	State bool
+
+	// Keycode in evdev format
+	KeyCode uint32
+}
+
+func (i *KeyboardInput) ToBytes() []byte {
+	output := make([]byte, 4)
+	output[0] = byte(InputTypeKeyboard)
+	d := output[1:]
+	d[0] = util.PackBits(i.State, i.Shift, i.Alt, i.Ctrl, i.Meta, i.Caps, false, false)
+	binary.LittleEndian.PutUint16(d[1:3], uint16(i.KeyCode))
+
+	return output
+}
+
+func (i *KeyboardInput) FromBytes(input []byte) error {
+	if input[0] != byte(InputTypeKeyboard) || len(input) < 2 {
+		return errors.New("data is not a keyboard input")
+	}
+
+	d := input[1:]
+	if len(d) != 3 {
+		return fmt.Errorf("invalid payload size %d should be 3 bytes", len(d))
+	}
+
+	i.State, i.Shift, i.Ctrl, i.Alt, i.Meta, i.Caps, _, _ = util.UnpackBits(d[0])
+	i.KeyCode = uint32(binary.LittleEndian.Uint16(d[1:3]))
+
+	return nil
+}

@@ -99,7 +99,13 @@ var inputChannel = peerConnection.createDataChannel('input', {
 #### Keyboard: `0x01`
 Payload Format:
 - Byte 0: `0x01`
-- Byte 1: `0x01` for keydown, `0x00` for keyup
+- Byte 1: Bitpacked key state
+  - Bit 0: KeyState
+  - Bit 1: Shift
+  - Bit 2: Control
+  - Bit 3: Alt
+  - Bit 4: Meta
+  - Bit 5: Caps
 - Byte 2-3: Keycode (https://developer.mozilla.org/en-US/docs/Web/API/UI_Events/Keyboard_event_code_values)
 
 #### Mouse: `0x02`
