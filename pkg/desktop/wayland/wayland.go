@@ -214,6 +214,62 @@ func (c *WaylandInputClient) SetKeyboardKey(i api.KeyboardInput) error {
 	return nil
 }
 
+// This blog post explains basically everything
+// https://medium.com/@damko/a-simple-humble-but-comprehensive-guide-to-xkb-for-linux-6f1ad5e13450
+// https://way-cooler.org/docs/wlroots/enum.wlr_keyboard_modifier.html explains modifier keys
+func (c *WaylandInputClient) CreateKeymap() error {
+	// Define your keymap data (this is a simplified example)
+	keymapData := `
+	xkb_keymap {
+    xkb_keycodes  { include "evdev+aliases(qwerty)" };
+    xkb_types     { include "complete" };
+    xkb_compat    { include "complete" };
+    xkb_symbols   { include "pc+us+inet(evdev)" };
+    xkb_geometry  { include "pc(pc105)" };
+};
+`
+
+	// Create a temporary file for the keymap
+	keymapFile, err := os.CreateTemp(os.TempDir(), "keymap-")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file for keymap: %v", err)
+	}
+	defer keymapFile.Close()
+
+	// Write the keymap data to the file
+	_, err = keymapFile.WriteString(keymapData)
+	if err != nil {
+		return fmt.Errorf("failed to write to keymap file: %v", err)
+	}
+
+	// Get the file size for the keymap
+	fileInfo, err := keymapFile.Stat()
+	if err != nil {
+		return fmt.Errorf("failed to stat keymap file: %v", err)
+	}
+	size := uint32(fileInfo.Size())
+
+	// Get the file descriptor
+	fd := int(keymapFile.Fd())
+
+	// Duplicate the file descriptor to keep it open after passing to Wayland
+	dupFd, err := syscall.Dup(fd)
+	if err != nil {
+		return fmt.Errorf("failed to duplicate file descriptor: %v", err)
+	}
+
+	// Now pass the file descriptor and size to Wayland
+	// 0x01 is the xkb format, which is currently the only format supported
+	error := c.keyboard.Keymap(0x01, dupFd, size)
+	if error != nil {
+		return fmt.Errorf("failed to set keymap: %v", err)
+	}
+
+	// The file descriptor dupFd should not be closed here, as Wayland will use it.
+	// It will be closed automatically when the Wayland server reads it.
+	return nil
+}
+
 func (c *WaylandInputClient) MoveMouse(dx, dy float64) error {
 	c.mtx.RLock()
 	defer c.mtx.RUnlock()
