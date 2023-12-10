@@ -207,7 +207,7 @@ func (c *WaylandInputClient) SetKeyboardKey(i api.KeyboardInput) error {
 		}
 		// The Keycode needs to be offset by 8
 		// This is just how XKB maps the evdev keycodes to the XKB keycodes
-		if err := c.keyboard.Key(uint32(time.Now().UnixMilli()), uint32(i.KeyCode+8), stateInt); err != nil {
+		if err := c.keyboard.Key(uint32(time.Now().UnixMilli()), uint32(EvdevKeycodeToXKBCode(WLRKeycode(i.KeyCode))), stateInt); err != nil {
 			return err
 		}
 	}

@@ -933,10 +933,10 @@ const (
 	SND_CNT   = (SND_MAX + 1)
 )
 
-// This is the mapping from linux to XKB as defined in /usr/share/X11/xkb/keycodes/evdev
-// All of the codes from https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
-func WLRKeycodeToXKBCode(k WLRKeycode) XKBKeycode {
-	return XKBKeycode(k + 8)
+// // This is the mapping from linux's evdev to XKB as defined in /usr/share/X11/xkb/keycodes/evdev
+// // All of the codes from https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
+func EvdevKeycodeToXKBCode(k WLRKeycode) XKBKeycode {
+	return XKBKeycode(k - 8)
 }
 
 func btoi(b bool) uint32 {
