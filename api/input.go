@@ -329,11 +329,11 @@ func (i *KeyboardInput) FromBytes(input []byte) error {
 
 	d := input[1:]
 	if len(d) != 3 {
-		return fmt.Errorf("invalid payload size %d should be 17 bytes", len(d))
+		return fmt.Errorf("invalid payload size %d should be 3 bytes", len(d))
 	}
 
-	i.State, i.Shift, i.Ctrl, i.Alt, i.Meta, i.Caps, _, _ = util.UnpackBits(input[1])
-	i.KeyCode = binary.LittleEndian.Uint32(d[1:3])
+	i.State, i.Shift, i.Ctrl, i.Alt, i.Meta, i.Caps, _, _ = util.UnpackBits(d[0])
+	i.KeyCode = uint32(binary.LittleEndian.Uint16(d[1:3]))
 
 	return nil
 }
