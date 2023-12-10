@@ -1,6 +1,8 @@
 package api
 
-import "io"
+import (
+	"io"
+)
 
 type Keyboard interface {
 	// GetName returns the name of the keyboard
@@ -8,6 +10,8 @@ type Keyboard interface {
 
 	// Open opens the keyboard for use
 	Open() error
+
+	SetKeyboardKey(KeyboardInput) error
 
 	io.Closer // The keyboard does IO, and should be closable
 }

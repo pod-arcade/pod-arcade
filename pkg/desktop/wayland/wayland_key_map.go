@@ -1,5 +1,7 @@
 package wayland
 
+import "github.com/pod-arcade/pod-arcade/api"
+
 type WLRModifierKey uint32
 
 const (
@@ -15,6 +17,7 @@ const (
 
 type WLRKeycode uint32
 type XKBKeycode uint32
+type XKBModifiers uint32
 
 const (
 	/*
@@ -934,4 +937,21 @@ const (
 // All of the codes from https://github.com/torvalds/linux/blob/master/include/uapi/linux/input-event-codes.h
 func WLRKeycodeToXKBCode(k WLRKeycode) XKBKeycode {
 	return XKBKeycode(k + 8)
+}
+
+func btoi(b bool) uint32 {
+	if b {
+		return 1
+	}
+	return 0
+}
+
+func APIInputToModifierState(i api.KeyboardInputModifiers) XKBModifiers {
+	var state uint32
+	state |= btoi(i.Shift) << WLR_MODIFIER_SHIFT
+	state |= btoi(i.Ctrl) << WLR_MODIFIER_CTRL
+	state |= btoi(i.Alt) << WLR_MODIFIER_ALT
+	state |= btoi(i.Meta) << WLR_MODIFIER_LOGO
+	state |= btoi(i.Caps) << WLR_MODIFIER_CAPS
+	return XKBModifiers(state)
 }

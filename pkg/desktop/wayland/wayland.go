@@ -17,6 +17,7 @@ import (
 )
 
 var _ api.Mouse = (*WaylandInputClient)(nil)
+var _ api.Keyboard = (*WaylandInputClient)(nil)
 
 type WaylandInputClient struct {
 	display         *client.Display
@@ -28,16 +29,18 @@ type WaylandInputClient struct {
 	seat            *client.Seat
 	sync.Once
 
-	// last known state of the mouse buttons
-	state struct {
+	// last known mouseState of the mouse buttons
+	mouseState struct {
 		lmb bool // left mouse button
 		mmb bool // middle mouse button
 		rmb bool // right mouse button
 	}
+	keyboardState XKBModifiers
 
-	mtx sync.RWMutex
-	ctx context.Context
-	l   zerolog.Logger
+	mtx  sync.RWMutex
+	ctx  context.Context
+	once sync.Once
+	l    zerolog.Logger
 }
 
 func NewWaylandInputClient(ctx context.Context) *WaylandInputClient {
@@ -54,72 +57,78 @@ func (c *WaylandInputClient) GetName() string {
 	return "Wayland Input Client"
 }
 
-func (c *WaylandInputClient) Open() error {
-	c.mtx.Lock()
-	defer c.mtx.Unlock()
-	c.l.Debug().Msgf("Connecting to Wayland")
-	if display, err := client.Connect(""); err != nil {
-		panic(err)
-	} else {
-		c.l.Debug().Msgf("...Connected Successfully")
-		c.display = display
-	}
+func (c *WaylandInputClient) Open() (returnErr error) {
+	c.once.Do(func() {
+		c.mtx.Lock()
+		defer c.mtx.Unlock()
+		c.l.Debug().Msgf("Connecting to Wayland")
+		if display, err := client.Connect(""); err != nil {
+			panic(err)
+		} else {
+			c.l.Debug().Msgf("...Connected Successfully")
+			c.display = display
+		}
 
-	c.l.Debug().Msgf("...Setting error handler")
-	c.display.SetErrorHandler(func(dee client.DisplayErrorEvent) {
-		c.l.Error().Str("err", dee.Message).Msg("The Display encountered an error")
+		c.l.Debug().Msgf("...Setting error handler")
+		c.display.SetErrorHandler(func(dee client.DisplayErrorEvent) {
+			c.l.Error().Str("err", dee.Message).Msg("The Display encountered an error")
+		})
+
+		c.l.Debug().Msgf("...Getting Registry")
+
+		if reg, err := c.display.GetRegistry(); err != nil {
+			panic(err)
+		} else {
+			c.registry = reg
+		}
+
+		c.l.Debug().Msgf("...Setting Global Registry Handler")
+		c.registry.SetGlobalHandler(c.GlobalRegistryHandler)
+		c.l.Debug().Msgf("...Waiting for Interfaces to Register")
+		c.WaitForDisplaySync() // Wait for interfaces to register
+		c.l.Debug().Msgf("...Waiting for Events to be Called")
+		c.WaitForDisplaySync() // Wait for events to be called
+
+		c.l.Debug().Msgf("...Creating virtual pointer")
+		if c.pointerManager != nil {
+			mouse, err := c.pointerManager.CreateVirtualPointer(c.seat)
+			if err != nil {
+				returnErr = err
+				return
+			}
+			c.l.Debug().Msgf("...Created virtual pointer")
+
+			c.pointer = mouse
+		} else {
+			c.l.Debug().Msgf("...display does not support virtual pointer")
+			returnErr = fmt.Errorf("display does not support virtual pointers")
+			return
+		}
+
+		// TODO: Need to actually get a seat. Seats may be optional for mice, but not keyboards.
+		c.l.Debug().Msgf("...Creating virtual keyboard")
+		if c.keyboardManager != nil {
+			keyboard, err := c.keyboardManager.CreateVirtualKeyboard(c.seat)
+			if err != nil {
+				returnErr = err
+				return
+			}
+			c.l.Debug().Msgf("...Created virtual keyboard")
+			c.keyboard = keyboard
+		} else {
+			c.l.Debug().Msgf("...display does not support virtual keyboards")
+			returnErr = fmt.Errorf("display does not support virtual keyboards")
+			return
+		}
+		c.l.Debug().Msgf("...Waiting for Final Display Sync")
+		err := c.CreateKeymap()
+		if err != nil {
+			returnErr = err
+			return
+		}
+		c.WaitForDisplaySync() // Wait for events to be called
 	})
-
-	c.l.Debug().Msgf("...Getting Registry")
-
-	if reg, err := c.display.GetRegistry(); err != nil {
-		panic(err)
-	} else {
-		c.registry = reg
-	}
-
-	c.l.Debug().Msgf("...Setting Global Registry Handler")
-	c.registry.SetGlobalHandler(c.GlobalRegistryHandler)
-	c.l.Debug().Msgf("...Waiting for Interfaces to Register")
-	c.WaitForDisplaySync() // Wait for interfaces to register
-	c.l.Debug().Msgf("...Waiting for Events to be Called")
-	c.WaitForDisplaySync() // Wait for events to be called
-
-	c.l.Debug().Msgf("...Creating virtual pointer")
-	if c.pointerManager != nil {
-		mouse, err := c.pointerManager.CreateVirtualPointer(c.seat)
-		if err != nil {
-			return err
-		}
-		c.l.Debug().Msgf("...Created virtual pointer")
-
-		c.pointer = mouse
-	} else {
-		c.l.Debug().Msgf("...display does not support virtual pointer")
-		return fmt.Errorf("display does not support virtual pointers")
-	}
-
-	// TODO: Need to actually get a seat. Seats may be optional for mice, but not keyboards.
-	c.l.Debug().Msgf("...Creating virtual keyboard")
-	if c.keyboardManager != nil {
-		keyboard, err := c.keyboardManager.CreateVirtualKeyboard(c.seat)
-		if err != nil {
-			return err
-		}
-		c.l.Debug().Msgf("...Created virtual keyboard")
-		c.keyboard = keyboard
-	} else {
-		c.l.Debug().Msgf("...display does not support virtual keyboards")
-		return fmt.Errorf("display does not support virtual keyboards")
-	}
-	c.l.Debug().Msgf("...Waiting for Final Display Sync")
-	err := c.CreateKeymap()
-	if err != nil {
-		return err
-	}
-	c.WaitForDisplaySync() // Wait for events to be called
-
-	return nil
+	return returnErr
 }
 
 // This blog post explains basically everything
@@ -177,6 +186,33 @@ func (c *WaylandInputClient) CreateKeymap() error {
 	// It will be closed automatically when the Wayland server reads it.
 	return nil
 }
+func (c *WaylandInputClient) SetKeyboardKey(i api.KeyboardInput) error {
+	c.mtx.RLock()
+	defer c.mtx.RUnlock()
+	c.l.Debug().Msgf("Handling KeyboardInput — %v", i)
+	if c.keyboard != nil {
+		// handle modifiers
+		mods := APIInputToModifierState(i.KeyboardInputModifiers)
+		if mods != c.keyboardState {
+			c.l.Debug().Msgf("Setting modifiers to %v", mods)
+			if err := c.keyboard.Modifiers(uint32(mods), 0, 0, 0); err != nil {
+				return err
+			}
+			c.keyboardState = mods
+		}
+		// handle keypress
+		stateInt := uint32(0)
+		if i.State {
+			stateInt = 1
+		}
+		// The Keycode needs to be offset by 8
+		// This is just how XKB maps the evdev keycodes to the XKB keycodes
+		if err := c.keyboard.Key(uint32(time.Now().UnixMilli()), uint32(i.KeyCode+8), stateInt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func (c *WaylandInputClient) MoveMouse(dx, dy float64) error {
 	c.mtx.RLock()
@@ -232,43 +268,27 @@ func (c *WaylandInputClient) SetMouseButton(btn uint32, state bool) error {
 }
 func (c *WaylandInputClient) SetMouseButtonRight(state bool) error {
 	// #define BTN_RIGHT		0x111
-	if c.state.rmb == state {
+	if c.mouseState.rmb == state {
 		return nil
 	}
-	c.state.rmb = state
+	c.mouseState.rmb = state
 	return c.SetMouseButton(0x111, state)
 }
 func (c *WaylandInputClient) SetMouseButtonLeft(state bool) error {
 	// #define BTN_LEFT		0x110
-	if c.state.lmb == state {
+	if c.mouseState.lmb == state {
 		return nil
 	}
-	c.state.lmb = state
+	c.mouseState.lmb = state
 	return c.SetMouseButton(0x110, state)
 }
 func (c *WaylandInputClient) SetMouseButtonMiddle(state bool) error {
 	// #define BTN_MIDDLE		0x112
-	if c.state.mmb == state {
+	if c.mouseState.mmb == state {
 		return nil
 	}
-	c.state.mmb = state
+	c.mouseState.mmb = state
 	return c.SetMouseButton(0x112, state)
-}
-
-func (c *WaylandInputClient) SetKeyboardKey(vk int, state bool) error {
-	c.mtx.RLock()
-	defer c.mtx.RUnlock()
-	c.l.Debug().Msgf("Setting Keyboard Key %v to %v", vk, state)
-	if c.keyboard != nil {
-		stateInt := uint32(0)
-		if state {
-			stateInt = 1
-		}
-		if err := c.keyboard.Key(uint32(time.Now().UnixMilli()), uint32(vk), stateInt); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func (c *WaylandInputClient) GlobalRegistryHandler(evt client.RegistryGlobalEvent) {
@@ -344,6 +364,7 @@ func (c *WaylandInputClient) WaitForDisplaySync() {
 func (c *WaylandInputClient) Close() error {
 	c.mtx.Lock()
 	defer c.mtx.Unlock()
+	defer func() { c.once = sync.Once{} }()
 
 	// Destroy the pointer if we have one
 	if c.pointer != nil {
