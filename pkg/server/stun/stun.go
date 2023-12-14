@@ -47,6 +47,8 @@ func StartStunServer(ctx context.Context, port int) error {
 					return
 				}
 
+				transactionID := message.TransactionID
+
 				// Process STUN message (this is a simplified example)
 				if message.Type.Method != stun.MethodBinding || message.Type.Class != stun.ClassRequest {
 					l.Warn().Msgf("Unsupported STUN message from %s\n", remoteAddr)
@@ -56,7 +58,7 @@ func StartStunServer(ctx context.Context, port int) error {
 				remoteIP := remoteAddr.(*net.UDPAddr).IP
 				remotePort := remoteAddr.(*net.UDPAddr).Port
 				// Build a STUN response
-				response, err := stun.Build(stun.TransactionID, stun.BindingSuccess,
+				response, err := stun.Build(stun.NewTransactionIDSetter(transactionID), stun.BindingSuccess,
 					stun.XORMappedAddress{IP: remoteIP, Port: remotePort},
 				)
 				if err != nil {
