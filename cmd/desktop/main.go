@@ -35,7 +35,7 @@ var DesktopConfig struct {
 	ICEServersJSON string             `env:"ICE_SERVERS" envDefault:"" json:"-"`
 
 	CLOUD_AUTH_KEY string `env:"CLOUD_AUTH_KEY" envDefault:""`
-	CLOUD_URL      string `env:"CLOUD_URL" envDefault:"https://play.podarcade.com"`
+	CLOUD_URL      string `env:"CLOUD_URL" envDefault:"https://play.pod-arcade.com"`
 }
 
 var logger = log.NewLogger("desktop", map[string]string{})
