@@ -40,14 +40,17 @@ type MQTTSignaler struct {
 
 	sessions map[api.SessionID]api.Session
 
+	extraIceServers []webrtc.ICEServer
+
 	ctx context.Context
 	l   zerolog.Logger
 }
 
 func NewMQTTSignaler(configurator MQTTConfigurator) *MQTTSignaler {
 	client := &MQTTSignaler{
-		configurator: configurator,
-		sessions:     map[api.SessionID]api.Session{},
+		configurator:    configurator,
+		sessions:        map[api.SessionID]api.Session{},
+		extraIceServers: []webrtc.ICEServer{},
 	}
 
 	return client
@@ -179,6 +182,19 @@ func (c *MQTTSignaler) onConnect(client mqtt.Client) {
 		}
 	})
 
+	// Listen for ICE Servers from the server
+	client.Subscribe("server/ice-servers", 0, func(client mqtt.Client, m mqtt.Message) {
+		iceServers := []webrtc.ICEServer{}
+		err := json.Unmarshal(m.Payload(), &iceServers)
+		if err != nil {
+			c.l.Error().Msgf("Failed to decode ICE Servers. %v", err)
+			return
+		}
+		c.l.Debug().Msgf("Received ICE Servers from server. %v", iceServers)
+		c.extraIceServers = iceServers
+	})
+	c.l.Debug().Msg("Subscribed to offer-ice-candidate")
+
 	c.Client.Publish(c.getTopicPrefix()+"status", 0, true, "online")
 	c.l.Debug().Msg("Published online status")
 }
@@ -196,6 +212,34 @@ func (c *MQTTSignaler) publishOfflineMessage() {
 	c.Client.Publish(c.getTopicPrefix()+"status", 0, true, "offline")
 }
 
+func (c *MQTTSignaler) getWebRTCConfig() (*webrtc.API, *webrtc.Configuration) {
+	webrtcAPI, webRTCAPIConfig := c.desktop.GetWebRTCAPI()
+	// Let's not modify the original config
+	// Copy the config
+	var copyConfig webrtc.Configuration
+	if webRTCAPIConfig != nil {
+		copyConfig := *webRTCAPIConfig
+		// Replace the pointer to the ICE Servers with a new slice
+		copyConfig.ICEServers = []webrtc.ICEServer{}
+		// Copy the old ICE Servers into the new slice
+		copyConfig.ICEServers = append(copyConfig.ICEServers, webRTCAPIConfig.ICEServers...)
+	} else {
+		// If we don't have a config, create a new one
+		copyConfig = webrtc.Configuration{
+			ICEServers: []webrtc.ICEServer{},
+		}
+	}
+
+	// Append our extra ICE Servers if we have any
+	if len(c.extraIceServers) > 0 {
+		c.l.Debug().Msgf("Appending extra ICE Servers to config. %v + %v", webRTCAPIConfig.ICEServers, c.extraIceServers)
+		copyConfig.ICEServers = append(copyConfig.ICEServers, c.extraIceServers...)
+	}
+
+	// Return the original API, and a copy of our modified config
+	return webrtcAPI, &copyConfig
+}
+
 func (c *MQTTSignaler) onOffer(sessionId api.SessionID, sdp webrtc.SessionDescription) {
 	c.l.Debug().Msgf("Received offer for session %v", sessionId)
 
@@ -206,7 +250,7 @@ func (c *MQTTSignaler) onOffer(sessionId api.SessionID, sdp webrtc.SessionDescri
 		c.l.Debug().Msgf("Creating new session %v", sessionId)
 		session = desktop.NewSession(c.ctx, sessionId)
 		c.sessions[sessionId] = session
-		_, err := session.CreatePeerConnection(c.desktop.GetWebRTCAPI())
+		_, err := session.CreatePeerConnection(c.getWebRTCConfig())
 		if err != nil {
 			c.l.Error().Err(err).Msg("Failed to create peer connection")
 			return
