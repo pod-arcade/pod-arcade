@@ -1,7 +1,6 @@
 package log
 
 import (
-	"fmt"
 	"os"
 	"strings"
 
@@ -30,7 +29,6 @@ func LevelForComponent(component string) zerolog.Level {
 	compEnv = strings.ReplaceAll(compEnv, ".", "_")
 	compEnv = strings.ReplaceAll(compEnv, " ", "_")
 	compEnv = strings.ToUpper(EnvLogLevel + "_" + compEnv)
-	fmt.Println(compEnv)
 	if os.Getenv(compEnv) != "" {
 		return LevelFromString(os.Getenv(compEnv))
 	} else {
