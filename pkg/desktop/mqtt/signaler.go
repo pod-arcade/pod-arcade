@@ -142,7 +142,7 @@ func (c *MQTTSignaler) onConnect(client mqtt.Client) {
 	// Setup subscription for offers
 	client.Subscribe(c.getTopicPrefix()+"sessions/+/webrtc-offer", 0, func(client mqtt.Client, m mqtt.Message) {
 		components := strings.Split(strings.Replace(m.Topic(), c.getTopicPrefix(), "", 1), "/")
-		sessionId := components[2]
+		sessionId := components[1]
 		sdp := webrtc.SessionDescription{
 			Type: webrtc.SDPTypeOffer,
 			SDP:  string(m.Payload()),
@@ -153,8 +153,8 @@ func (c *MQTTSignaler) onConnect(client mqtt.Client) {
 
 	// Listen for Remote ICE Candidates
 	client.Subscribe(c.getTopicPrefix()+"sessions/+/offer-ice-candidate", 0, func(client mqtt.Client, m mqtt.Message) {
-		components := strings.Split(m.Topic(), "/")
-		sessionId := components[3]
+		components := strings.Split(strings.Replace(m.Topic(), c.getTopicPrefix(), "", 1), "/")
+		sessionId := components[1]
 		candidate := webrtc.ICECandidateInit{}
 		err := json.Unmarshal(m.Payload(), &candidate)
 		if err != nil {
