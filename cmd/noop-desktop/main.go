@@ -20,6 +20,17 @@ var DesktopConfig struct {
 
 	WEBRTC_PORT int      `env:"WEBRTC_PORT" envDefault:"0"`
 	WEBRTC_IPS  []string `env:"WEBRTC_IPS"`
+
+	CLOUD_AUTH_KEY string `env:"CLOUD_AUTH_KEY" envDefault:""`
+	CLOUD_URL      string `env:"CLOUD_URL" envDefault:"https://cloud.podarcade.com"`
+}
+
+func getMQTTConfigurator() mqtt.MQTTConfigurator {
+	if DesktopConfig.CLOUD_AUTH_KEY == "" {
+		return mqtt.NewLocalMQTTConfigurator(DesktopConfig.MQTT_HOST, DesktopConfig.DESKTOP_PSK, DesktopConfig.DESKTOP_ID)
+	} else {
+		return mqtt.NewCloudMQTTConfigurator(DesktopConfig.CLOUD_URL, DesktopConfig.CLOUD_AUTH_KEY)
+	}
 }
 
 func main() {
@@ -45,11 +56,7 @@ func main() {
 	// Register all of the inputs, video sources, audio sources, and signalers.
 	d := desktop.
 		NewDesktop().
-		WithSignaler(mqtt.NewMQTTSignaler(mqtt.MQTTConfig{
-			Host:       DesktopConfig.MQTT_HOST,
-			DesktopID:  DesktopConfig.DESKTOP_ID,
-			DesktopPSK: DesktopConfig.DESKTOP_PSK,
-		})).
+		WithSignaler(mqtt.NewMQTTSignaler(getMQTTConfigurator())).
 		WithVideoSource(cmd_capture.NewCommandCaptureH264(&sample_recorder.SampleRecorder{}))
 
 	// Register a webrtc API. Includes all of the codecs, interceptors, etc.

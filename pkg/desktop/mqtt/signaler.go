@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
-	"fmt"
 	"net/url"
 	"strings"
 	"time"
@@ -18,17 +17,22 @@ import (
 	"github.com/rs/zerolog"
 )
 
+type MQTTConfigurator interface {
+	GetConfiguration(ctx context.Context) *MQTTConfig
+}
+
 type MQTTConfig struct {
-	Host       string
-	DesktopID  string
-	DesktopPSK string
+	Host        string
+	Password    string
+	Username    string
+	TopicPrefix string
 }
 
 var _ api.Signaler = (*MQTTSignaler)(nil)
 
 type MQTTSignaler struct {
-	Client mqtt.Client
-	cfg    MQTTConfig
+	Client       mqtt.Client
+	configurator MQTTConfigurator
 
 	desktop api.Desktop
 
@@ -40,14 +44,10 @@ type MQTTSignaler struct {
 	l   zerolog.Logger
 }
 
-func NewMQTTSignaler(cfg MQTTConfig) *MQTTSignaler {
+func NewMQTTSignaler(configurator MQTTConfigurator) *MQTTSignaler {
 	client := &MQTTSignaler{
-		cfg: cfg,
-		l: log.NewLogger("mqtt-client", map[string]string{
-			"DesktopID": cfg.DesktopID,
-			"MQTTHost":  cfg.Host,
-		}),
-		sessions: map[api.SessionID]api.Session{},
+		configurator: configurator,
+		sessions:     map[api.SessionID]api.Session{},
 	}
 
 	return client
@@ -68,13 +68,18 @@ func (c *MQTTSignaler) Run(ctx context.Context, desktop api.Desktop) error {
 	c.ctx = ctx
 
 	opts := mqtt.NewClientOptions()
+	cfg := c.configurator.GetConfiguration(c.ctx)
+	c.l = log.NewLogger("mqtt-client", map[string]string{
+		"Username": cfg.Username,
+		"MQTTHost": cfg.Host,
+	})
 
-	opts.AddBroker(c.cfg.Host)
+	opts.AddBroker(cfg.Host)
 
-	if c.cfg.DesktopPSK != "" {
+	if cfg.Password != "" {
 		opts.
-			SetUsername("desktop:" + c.cfg.DesktopID).
-			SetPassword(c.cfg.DesktopPSK)
+			SetUsername(cfg.Username).
+			SetPassword(cfg.Password)
 	}
 
 	opts.SetAutoReconnect(true) // For reconnecting to the same server
@@ -88,12 +93,18 @@ func (c *MQTTSignaler) Run(ctx context.Context, desktop api.Desktop) error {
 	opts.OnConnectionLost = func(_ mqtt.Client, err error) {
 		c.l.Error().Msgf("Lost connection to MQTT — %v", err)
 	}
-	opts.OnReconnecting = func(_ mqtt.Client, _ *mqtt.ClientOptions) {
+	opts.OnReconnecting = func(cl mqtt.Client, opts *mqtt.ClientOptions) {
 		c.l.Warn().Msgf("Reconnecting...")
+		// reset the configuration on a reconnect attempt
+		cfg := c.configurator.GetConfiguration(c.ctx)
+		opts.SetUsername(cfg.Username)
+		opts.SetPassword(cfg.Username)
+		opts.Servers = []*url.URL{}
+		opts.AddBroker(cfg.Host)
 	}
 
 	opts.WillEnabled = true
-	opts.SetWill(c.getTopicPrefix()+"/status", "offline", 0, true)
+	opts.SetWill(c.getTopicPrefix()+"status", "offline", 0, true)
 
 	// periodically publish online messages while we're still running
 	go func() {
@@ -115,7 +126,7 @@ func (c *MQTTSignaler) Run(ctx context.Context, desktop api.Desktop) error {
 	// This is where we setup our subscriptions and handle session events
 	c.Client.Connect()
 
-	metrics.StartAdvancedMQTTMetricsPublisher(ctx, c.cfg.DesktopID, &c.Client, time.Second*5)
+	metrics.StartAdvancedMQTTMetricsPublisher(ctx, c.getTopicPrefix(), &c.Client, time.Second*5)
 
 	// Wait for the done context
 	<-c.ctx.Done()
@@ -129,9 +140,9 @@ func (c *MQTTSignaler) Run(ctx context.Context, desktop api.Desktop) error {
 func (c *MQTTSignaler) onConnect(client mqtt.Client) {
 	c.l.Debug().Msg("Connected over MQTT")
 	// Setup subscription for offers
-	client.Subscribe(c.getTopicPrefix()+"/sessions/+/webrtc-offer", 0, func(client mqtt.Client, m mqtt.Message) {
-		components := strings.Split(m.Topic(), "/")
-		sessionId := components[3]
+	client.Subscribe(c.getTopicPrefix()+"sessions/+/webrtc-offer", 0, func(client mqtt.Client, m mqtt.Message) {
+		components := strings.Split(strings.Replace(m.Topic(), c.getTopicPrefix(), "", 1), "/")
+		sessionId := components[2]
 		sdp := webrtc.SessionDescription{
 			Type: webrtc.SDPTypeOffer,
 			SDP:  string(m.Payload()),
@@ -141,7 +152,7 @@ func (c *MQTTSignaler) onConnect(client mqtt.Client) {
 	c.l.Debug().Msg("Subscribed to webrtc-offer")
 
 	// Listen for Remote ICE Candidates
-	client.Subscribe(c.getTopicPrefix()+"/sessions/+/offer-ice-candidate", 0, func(client mqtt.Client, m mqtt.Message) {
+	client.Subscribe(c.getTopicPrefix()+"sessions/+/offer-ice-candidate", 0, func(client mqtt.Client, m mqtt.Message) {
 		components := strings.Split(m.Topic(), "/")
 		sessionId := components[3]
 		candidate := webrtc.ICECandidateInit{}
@@ -160,7 +171,7 @@ func (c *MQTTSignaler) onConnect(client mqtt.Client) {
 	c.l.Debug().Msg("Subscribed to offer-ice-candidate")
 
 	// Detect bugged status
-	client.Subscribe(c.getTopicPrefix()+"/status", 0, func(client mqtt.Client, m mqtt.Message) {
+	client.Subscribe(c.getTopicPrefix()+"status", 0, func(client mqtt.Client, m mqtt.Message) {
 		if string(m.Payload()) == "offline" {
 			// If we're online to see this, reset us to online.
 			c.l.Debug().Msg("Saw offline published from us, but we're online to see that message. Resetting status back to online.")
@@ -168,20 +179,21 @@ func (c *MQTTSignaler) onConnect(client mqtt.Client) {
 		}
 	})
 
-	c.Client.Publish(c.getTopicPrefix()+"/status", 0, true, "online")
+	c.Client.Publish(c.getTopicPrefix()+"status", 0, true, "online")
 	c.l.Debug().Msg("Published online status")
 }
 
 func (c *MQTTSignaler) getTopicPrefix() string {
-	return fmt.Sprintf("desktops/%v", c.cfg.DesktopID)
+	cfg := c.configurator.GetConfiguration(c.ctx)
+	return cfg.TopicPrefix
 }
 
 func (c *MQTTSignaler) publishOnlineMessage() {
-	c.Client.Publish(c.getTopicPrefix()+"/status", 0, true, "online")
+	c.Client.Publish(c.getTopicPrefix()+"status", 0, true, "online")
 }
 
 func (c *MQTTSignaler) publishOfflineMessage() {
-	c.Client.Publish(c.getTopicPrefix()+"/status", 0, true, "offline")
+	c.Client.Publish(c.getTopicPrefix()+"status", 0, true, "offline")
 }
 
 func (c *MQTTSignaler) onOffer(sessionId api.SessionID, sdp webrtc.SessionDescription) {
@@ -235,7 +247,8 @@ func (c *MQTTSignaler) onOffer(sessionId api.SessionID, sdp webrtc.SessionDescri
 }
 
 func (c *MQTTSignaler) publishAnswer(sessionId string, answerSdp webrtc.SessionDescription) {
-	c.Client.Publish(c.getTopicPrefix()+"/sessions/"+sessionId+"/webrtc-answer", 0, false, answerSdp.SDP)
+	c.l.Debug().Msgf("Publishing answer for session %v", sessionId)
+	c.Client.Publish(c.getTopicPrefix()+"sessions/"+sessionId+"/webrtc-answer", 1, false, answerSdp.SDP)
 }
 
 func (c *MQTTSignaler) publishICECandidate(sessionId string, candidate webrtc.ICECandidateInit) {
@@ -243,5 +256,6 @@ func (c *MQTTSignaler) publishICECandidate(sessionId string, candidate webrtc.IC
 	if err != nil {
 		panic(err) // This really can't happen...
 	}
-	c.Client.Publish(c.getTopicPrefix()+"/sessions/"+sessionId+"/answer-ice-candidate", 0, false, candidateBytes)
+	c.l.Debug().Msgf("Publishing ice candidate for session %v", sessionId)
+	c.Client.Publish(c.getTopicPrefix()+"sessions/"+sessionId+"/answer-ice-candidate", 0, false, candidateBytes)
 }

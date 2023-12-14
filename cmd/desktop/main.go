@@ -33,6 +33,9 @@ var DesktopConfig struct {
 
 	ICEServers     []webrtc.ICEServer `json:"-"`
 	ICEServersJSON string             `env:"ICE_SERVERS" envDefault:"" json:"-"`
+
+	CLOUD_AUTH_KEY string `env:"CLOUD_AUTH_KEY" envDefault:""`
+	CLOUD_URL      string `env:"CLOUD_URL" envDefault:"https://cloud.podarcade.com"`
 }
 
 var logger = log.NewLogger("desktop", map[string]string{})
@@ -45,6 +48,14 @@ func configureICE() error {
 		}
 	}
 	return nil
+}
+
+func getMQTTConfigurator() mqtt.MQTTConfigurator {
+	if DesktopConfig.CLOUD_AUTH_KEY == "" {
+		return mqtt.NewLocalMQTTConfigurator(DesktopConfig.MQTT_HOST, DesktopConfig.DESKTOP_PSK, DesktopConfig.DESKTOP_ID)
+	} else {
+		return mqtt.NewCloudMQTTConfigurator(DesktopConfig.CLOUD_URL, DesktopConfig.CLOUD_AUTH_KEY)
+	}
 }
 
 func main() {
@@ -90,11 +101,7 @@ func main() {
 				wf_recorder.NewScreenCapture(DesktopConfig.VIDEO_QUALITY, !DesktopConfig.DISABLE_HW_ACCEL, DesktopConfig.VIDEO_PROFILE),
 			)).
 		WithAudioSource(cmd_capture.NewCommandCaptureOgg(pulseaudio.NewGSTPulseAudioCapture())).
-		WithSignaler(mqtt.NewMQTTSignaler(mqtt.MQTTConfig{
-			Host:       DesktopConfig.MQTT_HOST,
-			DesktopID:  DesktopConfig.DESKTOP_ID,
-			DesktopPSK: DesktopConfig.DESKTOP_PSK,
-		})).
+		WithSignaler(mqtt.NewMQTTSignaler(getMQTTConfigurator())).
 		WithGamepad(uinput.CreateVirtualGamepad(udev, 0, 0x045E, 0x02D1)).
 		WithGamepad(uinput.CreateVirtualGamepad(udev, 1, 0x045E, 0x02D1)).
 		WithGamepad(uinput.CreateVirtualGamepad(udev, 2, 0x045E, 0x02D1)).

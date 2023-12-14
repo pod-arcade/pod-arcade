@@ -7,7 +7,7 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
 
-func StartSimpleMQTTMetricsPublisher(ctx context.Context, desktopId string, mqttClient *mqtt.Client, interval time.Duration) {
+func StartSimpleMQTTMetricsPublisher(ctx context.Context, topicPrefix string, mqttClient *mqtt.Client, interval time.Duration) {
 	client := *mqttClient
 	go func() {
 		ticker := time.NewTicker(interval)
@@ -17,13 +17,13 @@ func StartSimpleMQTTMetricsPublisher(ctx context.Context, desktopId string, mqtt
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				client.Publish("desktops/"+desktopId+"/metrics", 0, true, GetMetrics())
+				client.Publish(topicPrefix+"metrics", 0, true, GetMetrics())
 			}
 		}
 	}()
 }
 
-func StartAdvancedMQTTMetricsPublisher(ctx context.Context, desktopId string, mqttClient *mqtt.Client, interval time.Duration) {
+func StartAdvancedMQTTMetricsPublisher(ctx context.Context, topicPrefix string, mqttClient *mqtt.Client, interval time.Duration) {
 	client := *mqttClient
 	go func() {
 		ticker := time.NewTicker(interval)
@@ -35,7 +35,7 @@ func StartAdvancedMQTTMetricsPublisher(ctx context.Context, desktopId string, mq
 			case <-ticker.C:
 				m := GetMetricsByKey()
 				for k, v := range m {
-					client.Publish("desktops/"+desktopId+"/metrics/"+k, 0, true, v)
+					client.Publish(topicPrefix+"metrics/"+k, 0, true, v)
 				}
 			}
 		}

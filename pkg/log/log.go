@@ -92,7 +92,7 @@ func GetBaseLogger() zerolog.Logger {
 }
 
 func NewLogger(component string, context map[string]string) zerolog.Logger {
-	ctx := GetBaseLogger().With().Str("Component", component)
+	ctx := GetBaseLogger().Level(LevelForComponent(component)).With().Str("Component", component)
 
 	for k, v := range context {
 		ctx = ctx.Str(k, v)
