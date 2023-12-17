@@ -218,7 +218,7 @@ func (c *MQTTSignaler) getWebRTCConfig() (*webrtc.API, *webrtc.Configuration) {
 	// Copy the config
 	var copyConfig webrtc.Configuration
 	if webRTCAPIConfig != nil {
-		copyConfig := *webRTCAPIConfig
+		copyConfig = *webRTCAPIConfig
 		// Replace the pointer to the ICE Servers with a new slice
 		copyConfig.ICEServers = []webrtc.ICEServer{}
 		// Copy the old ICE Servers into the new slice
