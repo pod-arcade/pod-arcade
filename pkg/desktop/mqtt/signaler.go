@@ -116,6 +116,7 @@ func (c *MQTTSignaler) Run(ctx context.Context, desktop api.Desktop) error {
 			select {
 			case <-ticker.C:
 				c.publishOnlineMessage()
+				c.publishICEServers()
 			case <-c.ctx.Done():
 				return
 			}
@@ -195,7 +196,8 @@ func (c *MQTTSignaler) onConnect(client mqtt.Client) {
 	})
 	c.l.Debug().Msg("Subscribed to offer-ice-candidate")
 
-	c.Client.Publish(c.getTopicPrefix()+"status", 0, true, "online")
+	c.publishOnlineMessage()
+	c.publishICEServers()
 	c.l.Debug().Msg("Published online status")
 }
 
@@ -206,6 +208,15 @@ func (c *MQTTSignaler) getTopicPrefix() string {
 
 func (c *MQTTSignaler) publishOnlineMessage() {
 	c.Client.Publish(c.getTopicPrefix()+"status", 0, true, "online")
+}
+func (c *MQTTSignaler) publishICEServers() {
+	_, config := c.desktop.GetWebRTCAPI()
+	iceServersString, err := json.Marshal(config.ICEServers)
+	if err != nil {
+		c.l.Error().Msgf("Failed to encode ICE Servers. %v", err)
+		return
+	}
+	c.Client.Publish(c.getTopicPrefix()+"ice-servers", 0, true, iceServersString)
 }
 
 func (c *MQTTSignaler) publishOfflineMessage() {
