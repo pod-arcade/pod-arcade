@@ -101,7 +101,7 @@ func (c *MQTTSignaler) Run(ctx context.Context, desktop api.Desktop) error {
 		// reset the configuration on a reconnect attempt
 		cfg := c.configurator.GetConfiguration(c.ctx)
 		opts.SetUsername(cfg.Username)
-		opts.SetPassword(cfg.Username)
+		opts.SetPassword(cfg.Password)
 		opts.Servers = []*url.URL{}
 		opts.AddBroker(cfg.Host)
 	}
