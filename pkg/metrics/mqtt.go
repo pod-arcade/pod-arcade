@@ -17,7 +17,7 @@ func StartSimpleMQTTMetricsPublisher(ctx context.Context, topicPrefix string, mq
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				client.Publish(topicPrefix+"metrics", 0, true, GetMetrics())
+				client.Publish(topicPrefix+"metrics", 0, false, GetMetrics())
 			}
 		}
 	}()
@@ -35,7 +35,7 @@ func StartAdvancedMQTTMetricsPublisher(ctx context.Context, topicPrefix string, 
 			case <-ticker.C:
 				m := GetMetricsByKey()
 				for k, v := range m {
-					client.Publish(topicPrefix+"metrics/"+k, 0, true, v)
+					client.Publish(topicPrefix+"metrics/"+k, 0, false, v)
 				}
 			}
 		}

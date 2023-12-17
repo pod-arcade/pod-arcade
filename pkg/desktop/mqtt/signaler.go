@@ -130,7 +130,7 @@ func (c *MQTTSignaler) Run(ctx context.Context, desktop api.Desktop) error {
 	// This is where we setup our subscriptions and handle session events
 	c.Client.Connect()
 
-	metrics.StartAdvancedMQTTMetricsPublisher(ctx, c.getTopicPrefix(), &c.Client, time.Second*5)
+	metrics.StartAdvancedMQTTMetricsPublisher(ctx, c.getTopicPrefix(), &c.Client, time.Second*30)
 
 	// Wait for the done context
 	<-c.ctx.Done()
