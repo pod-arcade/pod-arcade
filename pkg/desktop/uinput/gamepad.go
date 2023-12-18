@@ -75,13 +75,19 @@ func (gp *VirtualGamepad) OpenGamepad() error {
 
 	// register Udev listeners to create our devices
 	// when the kernel has finished what it needs to
-	gp.udevListeners = append(gp.udevListeners, gp.udev.KernelEvents.AddListener(eventemitter.EventType(udev.ADD), eventemitter.HandleFunc(func(arguments ...interface{}) {
-		evt := (arguments[0]).(*udev.UEvent)
-		gp.handleEvent(evt)
-	})))
+	if gp.udev != nil {
+		gp.l.Info().Msg("Registering udev subsystem")
+		gp.udevListeners = append(gp.udevListeners, gp.udev.KernelEvents.AddListener(eventemitter.EventType(udev.ADD), eventemitter.HandleFunc(func(arguments ...interface{}) {
+			evt := (arguments[0]).(*udev.UEvent)
+			gp.handleEvent(evt)
+		})))
+	} else {
+		gp.l.Warn().Msg("udev is nil. Skipping udev subsystem.")
+	}
 
 	if gamepad, err := uinput.CreateGamepad("/dev/uinput", []byte(gamepadName), uint16(gp.vendorId), uint16(gp.productId)); err != nil {
-		return err
+		gp.l.Error().Err(err).Msg("Failed to create gamepad")
+		return nil
 	} else {
 		gp.gamepad = gamepad
 		gp.l.Info().Msgf("Gamepad created successfully — Gamepad %v", gp.gamepadId)

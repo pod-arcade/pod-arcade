@@ -36,6 +36,8 @@ var DesktopConfig struct {
 
 	CLOUD_AUTH_KEY string `env:"CLOUD_AUTH_KEY" envDefault:""`
 	CLOUD_URL      string `env:"CLOUD_URL" envDefault:"https://play.pod-arcade.com"`
+
+	EMULATE_UDEV bool `env:"EMULATE_UDEV" envDefault:"true"`
 }
 
 var logger = log.NewLogger("desktop", map[string]string{})
@@ -83,11 +85,14 @@ func main() {
 
 	// Open udev
 	// This is used by our game controllers to register themselves in applications
-	udev := udev.NewUDev(ctx)
-	if err := udev.Open(); err != nil {
-		panic(err)
+	var uDev *udev.UDev
+	if DesktopConfig.EMULATE_UDEV {
+		uDev = udev.NewUDev(ctx)
+		if err := uDev.Open(); err != nil {
+			panic(err)
+		}
+		defer uDev.Close()
 	}
-	defer udev.Close()
 
 	// Create Desktop
 	// Register all of the inputs, video sources, audio sources, and signalers.
@@ -102,10 +107,10 @@ func main() {
 			)).
 		WithAudioSource(cmd_capture.NewCommandCaptureOgg(pulseaudio.NewGSTPulseAudioCapture())).
 		WithSignaler(mqtt.NewMQTTSignaler(getMQTTConfigurator())).
-		WithGamepad(uinput.CreateVirtualGamepad(udev, 0, 0x045E, 0x02D1)).
-		WithGamepad(uinput.CreateVirtualGamepad(udev, 1, 0x045E, 0x02D1)).
-		WithGamepad(uinput.CreateVirtualGamepad(udev, 2, 0x045E, 0x02D1)).
-		WithGamepad(uinput.CreateVirtualGamepad(udev, 3, 0x045E, 0x02D1)).
+		WithGamepad(uinput.CreateVirtualGamepad(uDev, 0, 0x045E, 0x02D1)).
+		WithGamepad(uinput.CreateVirtualGamepad(uDev, 1, 0x045E, 0x02D1)).
+		WithGamepad(uinput.CreateVirtualGamepad(uDev, 2, 0x045E, 0x02D1)).
+		WithGamepad(uinput.CreateVirtualGamepad(uDev, 3, 0x045E, 0x02D1)).
 		WithMouse(wc).
 		WithKeyboard(wc)
 
