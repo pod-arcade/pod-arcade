@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"math/rand"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/pod-arcade/pod-arcade/pkg/log"
@@ -19,6 +20,8 @@ type CloudMQTTConfigurator struct {
 	lastConfig    *MQTTConfig
 
 	l zerolog.Logger
+
+	fetchLock sync.Mutex
 }
 
 type CloudConfigResponse struct {
@@ -40,9 +43,13 @@ func NewCloudMQTTConfigurator(cloudURL, authKey string) *CloudMQTTConfigurator {
 }
 
 func (c *CloudMQTTConfigurator) GetConfiguration(ctx context.Context) *MQTTConfig {
+	// Prevent multiple fetches from happening at the same time.
+	c.fetchLock.Lock()
+	defer c.fetchLock.Unlock()
+
 	// retry forever until we successfully get the config.
 	// exponentially backoff until we hit a max of 60 seconds
-	if c.lastConfig == nil || c.nextFetchTime.After(time.Now()) {
+	if c.lastConfig == nil || time.Now().After(c.nextFetchTime) {
 		config := &CloudConfigResponse{}
 		delay := time.Second * time.Duration(60*rand.Float32())
 
@@ -85,7 +92,7 @@ func (c *CloudMQTTConfigurator) GetConfiguration(ctx context.Context) *MQTTConfi
 			Username:    config.Username,
 			TopicPrefix: config.TopicPrefix,
 		}
-		c.nextFetchTime = c.nextFetchTime.Add(time.Second * 60)
+		c.nextFetchTime = time.Now().Add(time.Second * 60)
 	}
 	return c.lastConfig
 }
