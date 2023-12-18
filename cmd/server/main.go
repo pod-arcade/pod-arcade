@@ -178,12 +178,11 @@ func main() {
 	})
 	server.Log.Debug("Serving Metrics")
 
-	go func() {
-		err := server.Serve()
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
+	err = server.Serve()
+	if err != nil {
+		log.Fatal(fmt.Errorf("error starting mqtt server %v", err))
+		return
+	}
 
 	if ServerConfig.HTTPPort != -1 {
 		go func() {
@@ -229,4 +228,5 @@ func main() {
 	}()
 
 	<-ctx.Done()
+	server.Close()
 }
