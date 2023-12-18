@@ -42,7 +42,7 @@ func NewCloudMQTTConfigurator(cloudURL, authKey string) *CloudMQTTConfigurator {
 func (c *CloudMQTTConfigurator) GetConfiguration(ctx context.Context) *MQTTConfig {
 	// retry forever until we successfully get the config.
 	// exponentially backoff until we hit a max of 60 seconds
-	if c.lastConfig == nil || c.nextFetchTime.After(time.Now()) {
+	if c.lastConfig == nil || time.Now().After(c.nextFetchTime) {
 		config := &CloudConfigResponse{}
 		delay := time.Second * time.Duration(60*rand.Float32())
 
