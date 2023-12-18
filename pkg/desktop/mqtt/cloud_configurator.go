@@ -92,7 +92,7 @@ func (c *CloudMQTTConfigurator) GetConfiguration(ctx context.Context) *MQTTConfi
 			Username:    config.Username,
 			TopicPrefix: config.TopicPrefix,
 		}
-		c.nextFetchTime = c.nextFetchTime.Add(time.Second * 60)
+		c.nextFetchTime = time.Now().Add(time.Second * 60)
 	}
 	return c.lastConfig
 }
