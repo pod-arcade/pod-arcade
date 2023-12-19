@@ -1,5 +1,5 @@
 <h1 align="center">
-  <a href="https://pion.ly"><img src="assets/logo-stack.png" alt="Pod Arcade" height="200px"></a>
+  <a href="https://www.pod-arcade.com"><img src="assets/logo-stack.png" alt="Pod Arcade" height="200px"></a>
 </h1>
 <h4 align="center">Play Retro Games with your friends, directly in your browser!</h4>
 <p align="center">
@@ -17,9 +17,7 @@ Pod-Arcade is an open-source project that enables you to stream games via RetroA
 It is designed to be deployed on Kubernetes, but can also be deployed using Docker or any other container platform.
 
 There are two major components to Pod-Arcade:
-
 * The Pod-Arcade Server — an HTTP/MQTT server that manages the game streaming sessions. Desktops and web browsers connect to this server in order to stream games.
-
 * The Pod-Arcade Desktop — a desktop application that runs on Wayland and streams games to the Pod-Arcade Server.
 
 ## Getting Started
