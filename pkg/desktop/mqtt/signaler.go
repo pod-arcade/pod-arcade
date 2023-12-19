@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -42,6 +43,9 @@ type MQTTSignaler struct {
 
 	extraIceServers []webrtc.ICEServer
 
+	cachedConfig *MQTTConfig
+	configMutex  sync.Mutex
+
 	ctx context.Context
 	l   zerolog.Logger
 }
@@ -65,13 +69,21 @@ func (c *MQTTSignaler) SetNewSessionHandler(h api.NewSessionHandler) error {
 	return nil
 }
 
+func (c *MQTTSignaler) RefreshConfig() *MQTTConfig {
+	c.configMutex.Lock()
+	defer c.configMutex.Unlock()
+	cfg := c.configurator.GetConfiguration(c.ctx)
+	c.cachedConfig = cfg
+	return cfg
+}
+
 // Used to open the Signaler, and use this webrtc api to create new sessions
 func (c *MQTTSignaler) Run(ctx context.Context, desktop api.Desktop) error {
 	c.desktop = desktop
 	c.ctx = ctx
 
 	opts := mqtt.NewClientOptions()
-	cfg := c.configurator.GetConfiguration(c.ctx)
+	cfg := c.RefreshConfig()
 	c.l = log.NewLogger("mqtt-client", map[string]string{
 		"Username": cfg.Username,
 		"MQTTHost": cfg.Host,
@@ -99,7 +111,7 @@ func (c *MQTTSignaler) Run(ctx context.Context, desktop api.Desktop) error {
 	opts.OnReconnecting = func(cl mqtt.Client, opts *mqtt.ClientOptions) {
 		c.l.Warn().Msgf("Reconnecting...")
 		// reset the configuration on a reconnect attempt
-		cfg := c.configurator.GetConfiguration(c.ctx)
+		cfg := c.RefreshConfig()
 		opts.SetUsername(cfg.Username)
 		opts.SetPassword(cfg.Password)
 		opts.Servers = []*url.URL{}
@@ -202,8 +214,10 @@ func (c *MQTTSignaler) onConnect(client mqtt.Client) {
 }
 
 func (c *MQTTSignaler) getTopicPrefix() string {
-	cfg := c.configurator.GetConfiguration(c.ctx)
-	return cfg.TopicPrefix
+	if c.cachedConfig == nil {
+		c.RefreshConfig()
+	}
+	return c.cachedConfig.TopicPrefix
 }
 
 func (c *MQTTSignaler) publishOnlineMessage() {
