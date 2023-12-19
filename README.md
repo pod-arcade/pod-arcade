@@ -1,8 +1,14 @@
-# Pod-Arcade: Kubernetes-Native Retro Game Streaming
-
-***IMPORTANT NOTE: Pod-Arcade is still in early development. It is not yet ready for general use. We make no guarantees about the stability of each new build, and much of the documentation may be missing or incomplete.***
-
-Play Retro Games with your friends, directly in your browser!
+<h1 align="center">
+  <a href="https://pion.ly"><img src="assets/logo-stack.png" alt="Pod Arcade" height="200px"></a>
+</h1>
+<h4 align="center">Play Retro Games with your friends, directly in your browser!</h4>
+<p align="center">
+  <a href="https://www.pod-arcade.com">Website</a> •
+  <a href="https://www.pod-arcade.com/docs/intro">Docs</a> •
+  <a href="https://discord.gg/y8aasvEMy6">Discord</a> •
+  <a href="https://github.com/pod-arcade/pod-arcade/releases">Releases</a>
+</p>
+<br>
 
 ## Overview
 
@@ -85,21 +91,7 @@ There's docker-compose for running desktops in [pod-arcade/example-apps](https:/
 
 ## Screenshots
 
-Heres some screenshots of Pod-Arcade in action:
-
-### Homepage
-
-<img src="assets/screenshots/homepage.png" width=720px />
-
-### Gameplay
-
-<img src="assets/screenshots/mario-kart-n64-1.png" width=720px />
-
-<img src="assets/screenshots/mario-kart-n64-2.png" width=720px />
-
-<img src="assets/screenshots/switch-screenshot-1.png" width=720px />
-
-<img src="assets/screenshots/switch-screenshot-2.png" width=720px />
+Heres some screenshots of Pod-Arcade in action: [https://www.pod-arcade.com/screenshots/](https://www.pod-arcade.com/screenshots/)
 
 # License
 Pod-Arcade is licensed under the MIT License - see the LICENSE file for details.
