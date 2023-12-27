@@ -2,6 +2,7 @@ name: Create and Publish Desktop Image
 on:
   push:
     branches: ["main"]
+    tags: ["v*"]
   workflow_dispatch: {}
 env:
   REGISTRY: ghcr.io
@@ -34,8 +35,10 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
+            type=ref,event=tag
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
             type=sha
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
