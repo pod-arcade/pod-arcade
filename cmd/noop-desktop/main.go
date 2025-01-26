@@ -22,7 +22,7 @@ var DesktopConfig struct {
 	WEBRTC_IPS  []string `env:"WEBRTC_IPS"`
 
 	CLOUD_AUTH_KEY string `env:"CLOUD_AUTH_KEY" envDefault:""`
-	CLOUD_URL      string `env:"CLOUD_URL" envDefault:"https://cloud.pod-arcade.com"`
+	CLOUD_URL      string `env:"CLOUD_URL" envDefault:"https://play.pod-arcade.com"`
 }
 
 func getMQTTConfigurator() mqtt.MQTTConfigurator {
